@@ -1,0 +1,1988 @@
+{
+  "entities": {
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Global platform configuration controlled by the verified Platform Admin, including brokerage commission, escrow fee, promotional discount, live FX rates, broadcast banner, master switches, and removed showcase IDs.",
+      "type": "object",
+      "properties": {
+        "commissionRatePct": {
+          "type": "number",
+          "description": "Default/fallback one-time brokerage commission percentage (1 to 50)."
+        },
+        "familyApartmentCommissionPct": {
+          "type": "number",
+          "description": "Dedicated brokerage commission percentage for Family Apartments (1 to 50)."
+        },
+        "hotelRoomCommissionPct": {
+          "type": "number",
+          "description": "Dedicated brokerage commission percentage for Hotel Rooms (1 to 50)."
+        },
+        "industrialFactoryCommissionPct": {
+          "type": "number",
+          "description": "Dedicated brokerage commission percentage for Industrial Factories (1 to 50)."
+        },
+        "studentHousingCommissionPct": {
+          "type": "number",
+          "description": "Dedicated brokerage commission percentage for Student Housing (1 to 50)."
+        },
+        "wholeHouseCommissionPct": {
+          "type": "number",
+          "description": "Dedicated brokerage commission percentage for Whole House rentals (1 to 50)."
+        },
+        "commissionModel": {
+          "type": "string",
+          "enum": ["one_time_brokerage"],
+          "maxLength": 30,
+          "description": "Brokerage fee charging model (charged once at contract signing)."
+        },
+        "escrowProtectionFeePct": {
+          "type": "number",
+          "description": "Optional escrow service protection fee percentage (0 to 25)."
+        },
+        "tenantDiscountPct": {
+          "type": "number",
+          "description": "Optional global promotional discount percentage announced to tenants (0 to 50)."
+        },
+        "usdRateEgp": {
+          "type": "number",
+          "description": "Optional live exchange rate for 1 USD in EGP (1 to 1000)."
+        },
+        "sarRateEgp": {
+          "type": "number",
+          "description": "Optional live exchange rate for 1 SAR in EGP (1 to 1000)."
+        },
+        "eurRateEgp": {
+          "type": "number",
+          "description": "Optional live exchange rate for 1 EUR in EGP (1 to 1000)."
+        },
+        "aedRateEgp": {
+          "type": "number",
+          "description": "Optional live exchange rate for 1 AED in EGP (1 to 1000)."
+        },
+        "announcementText": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional live global announcement banner text shown immediately on user pages."
+        },
+        "allowNewListings": {
+          "type": "boolean",
+          "description": "Optional master switch allowing or pausing new property listings."
+        },
+        "allowNewBookings": {
+          "type": "boolean",
+          "description": "Optional master switch allowing or pausing new bookings and rental requests."
+        },
+        "removedShowcaseIds": {
+          "type": "array",
+          "description": "Bounded list (max 50) of removed showcase apartment IDs hidden across all user views."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the platform admin who updated the setting."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest update."
+        }
+      },
+      "required": [
+        "commissionRatePct",
+        "commissionModel",
+        "updatedByUid",
+        "updatedAt"
+      ]
+    },
+    "Apartment": {
+      "title": "Apartment",
+      "description": "Publicly listed real-estate unit across Egyptian governorates categorized into Family Apartments, Student Housing, Hotel Rooms (daily or monthly), and Industrial Factories, with optional base currency and 360-degree virtual tours. Deleted atomically upon rental.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the landlord."
+        },
+        "ownerDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the landlord."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Primary sector classification of the property, including Whole House rentals."
+        },
+        "billingMode": {
+          "type": "string",
+          "enum": ["monthly_only", "daily_or_monthly"],
+          "maxLength": 25,
+          "description": "Whether the unit is rented monthly only or supports daily/monthly stays (hotels and whole houses)."
+        },
+        "baseCurrency": {
+          "type": "string",
+          "enum": ["EGP", "USD", "SAR", "EUR", "AED"],
+          "maxLength": 10,
+          "description": "Landlord's chosen base currency when listing the unit."
+        },
+        "baseMonthlyPrice": {
+          "type": "number",
+          "description": "Monthly rent expressed in the chosen baseCurrency."
+        },
+        "baseDailyPrice": {
+          "type": "number",
+          "description": "Daily stay rate expressed in the chosen baseCurrency."
+        },
+        "baseStudentBedPrice": {
+          "type": "number",
+          "description": "Student bed monthly rate expressed in the chosen baseCurrency."
+        },
+        "dailyRateEgp": {
+          "type": "number",
+          "description": "Daily stay rate in EGP for hotel rooms (0 when monthly_only)."
+        },
+        "monthlyRentEgp": {
+          "type": "number",
+          "description": "Monthly rent in Egyptian Pounds."
+        },
+        "studentBedsCount": {
+          "type": "number",
+          "description": "Available student beds count when student rental is offered (0 if family/commercial only)."
+        },
+        "studentPricePerBedEgp": {
+          "type": "number",
+          "description": "Monthly rent per student bed in EGP, separate from family rent."
+        },
+        "houseApartmentsCount": {
+          "type": "number",
+          "description": "Number of residential apartments contained inside a whole-house listing (1 to 60)."
+        },
+        "houseFloorsCount": {
+          "type": "number",
+          "description": "Number of building floors in a whole-house listing (1 to 20)."
+        },
+        "houseHasGardenOrRoof": {
+          "type": "boolean",
+          "description": "Whether the whole house includes a private garden, courtyard, or rooftop terrace."
+        },
+        "houseHasPrivateGarage": {
+          "type": "boolean",
+          "description": "Whether the whole house includes dedicated private parking or garage."
+        },
+        "houseSpecsSummary": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Detailed building specifications for a whole-house listing (meters, entrances, finishing)."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 120,
+          "description": "Listing headline in Arabic or English."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1200,
+          "description": "Detailed unit specifications and neighborhood notes."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Egyptian governorate name."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "City, industrial zone, or neighborhood district."
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate within Egypt."
+        },
+        "lng": {
+          "type": "number",
+          "description": "Longitude coordinate within Egypt."
+        },
+        "bedrooms": {
+          "type": "number",
+          "description": "Number of rooms/bedrooms (0 allowed for open-plan factories)."
+        },
+        "bathrooms": {
+          "type": "number",
+          "description": "Number of bathrooms/restrooms."
+        },
+        "areaSqm": {
+          "type": "number",
+          "description": "Unit area in square meters (18 to 100000)."
+        },
+        "furnishing": {
+          "type": "string",
+          "enum": ["furnished", "semi_furnished", "unfurnished"],
+          "maxLength": 20,
+          "description": "Furnishing or industrial equipping level."
+        },
+        "imageKey": {
+          "type": "string",
+          "enum": [
+            "zamalek_nile",
+            "new_cairo_penthouse",
+            "alexandria_corniche",
+            "sheikh_zayed_duplex",
+            "maadi_garden",
+            "hotel_cairo_suite",
+            "hotel_redsea_room",
+            "factory_industrial_egypt",
+            "student_housing_cairo"
+          ],
+          "maxLength": 40,
+          "description": "Curated verified architectural photo asset identifier."
+        },
+        "hasVirtualTour": {
+          "type": "boolean",
+          "description": "Whether the unit includes an interactive 360-degree virtual tour or panorama."
+        },
+        "panorama360Key": {
+          "type": "string",
+          "enum": [
+            "none",
+            "cairo_nile_360",
+            "new_cairo_penthouse_360",
+            "hotel_suite_360",
+            "redsea_resort_360"
+          ],
+          "maxLength": 60,
+          "description": "Curated 360-degree panoramic preset identifier."
+        },
+        "panorama360DataUrl": {
+          "type": "string",
+          "maxLength": 180000,
+          "description": "Client-compressed 360-degree equirectangular JPEG data URL uploaded by the landlord."
+        },
+        "virtualTourUrl": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional external HTTPS 360-degree virtual tour link."
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["pending_review", "verified", "rejected"],
+          "maxLength": 20,
+          "description": "Legal document verification status."
+        },
+        "availabilityStatus": {
+          "type": "string",
+          "enum": ["available", "rented"],
+          "maxLength": 20,
+          "description": "Current occupancy state."
+        },
+        "commissionRatePct": {
+          "type": "number",
+          "description": "Active one-time platform brokerage commission percentage at listing time."
+        },
+        "mandateAccepted": {
+          "type": "boolean",
+          "description": "Confirmation of signed exclusive brokerage mandate."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "ownerDisplayName",
+        "category",
+        "billingMode",
+        "dailyRateEgp",
+        "monthlyRentEgp",
+        "studentBedsCount",
+        "studentPricePerBedEgp",
+        "title",
+        "description",
+        "governorate",
+        "district",
+        "lat",
+        "lng",
+        "bedrooms",
+        "bathrooms",
+        "areaSqm",
+        "furnishing",
+        "imageKey",
+        "verificationStatus",
+        "availabilityStatus",
+        "commissionRatePct",
+        "mandateAccepted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LegalDossier": {
+      "title": "LegalDossier",
+      "description": "Isolated PII legal ownership verification documents and signed brokerage commission contract.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the landlord."
+        },
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent property document ID."
+        },
+        "nationalIdNumber": {
+          "type": "string",
+          "minLength": 14,
+          "maxLength": 14,
+          "pattern": "^[23][0-9]{13}$",
+          "description": "14-digit Egyptian National ID."
+        },
+        "ownerPhone": {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 11,
+          "pattern": "^01[0125][0-9]{8}$",
+          "description": "Egyptian mobile number isolated from public scraping."
+        },
+        "exactAddress": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 250,
+          "description": "Private building, floor, or plot number."
+        },
+        "propertyRegistryNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 60,
+          "description": "Real Estate Publicity Department (Shahr Aqari) or industrial license ref."
+        },
+        "titleDeedFileName": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Uploaded ownership contract filename."
+        },
+        "titleDeedSha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 cryptographic digest of ownership contract."
+        },
+        "utilityBillFileName": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Uploaded utility bill filename."
+        },
+        "utilityBillSha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 cryptographic digest of utility bill."
+        },
+        "ownerIbanOrInstapay": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 80,
+          "description": "Payout destination for the landlord's net share."
+        },
+        "digitalSignatureName": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 80,
+          "description": "Full legal Arabic name signed on the mandate."
+        },
+        "exclusivityClauseAccepted": {
+          "type": "boolean",
+          "description": "Acceptance of non-circumvention and one-time brokerage commission deduction."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of legal dossier submission."
+        }
+      },
+      "required": [
+        "ownerId",
+        "apartmentId",
+        "nationalIdNumber",
+        "ownerPhone",
+        "exactAddress",
+        "propertyRegistryNumber",
+        "titleDeedFileName",
+        "titleDeedSha256",
+        "utilityBillFileName",
+        "utilityBillSha256",
+        "ownerIbanOrInstapay",
+        "digitalSignatureName",
+        "exclusivityClauseAccepted",
+        "createdAt"
+      ]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Escrow rental contract enforcing one-time brokerage commission deduction, multi-currency FX snapshot, and atomic property deletion.",
+      "type": "object",
+      "properties": {
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Rented property ID."
+        },
+        "apartmentTitle": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 120,
+          "description": "Snapshot of property title."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Snapshot of property sector category."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Snapshot of governorate."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Optional snapshot of neighborhood or district."
+        },
+        "lat": {
+          "type": "number",
+          "description": "Optional snapshot of property latitude inside Egypt (22.0 to 31.8)."
+        },
+        "lng": {
+          "type": "number",
+          "description": "Optional snapshot of property longitude inside Egypt (24.5 to 37.0)."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of tenant."
+        },
+        "tenantDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of tenant."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of landlord."
+        },
+        "landlordDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name snapshot of landlord."
+        },
+        "rentalUnit": {
+          "type": "string",
+          "enum": ["month", "day", "student_bed"],
+          "maxLength": 20,
+          "description": "Billing unit selected for the booking."
+        },
+        "unitPriceEgp": {
+          "type": "number",
+          "description": "Base rate per period (1 month, 1 day, or N student beds for 1 month)."
+        },
+        "unitsCount": {
+          "type": "number",
+          "description": "Number of months or days booked (1 to 365)."
+        },
+        "bedsBooked": {
+          "type": "number",
+          "description": "Number of student beds booked (0 when not student_bed)."
+        },
+        "leaseMonths": {
+          "type": "number",
+          "description": "Legacy-compatible duration count."
+        },
+        "monthlyRentEgp": {
+          "type": "number",
+          "description": "Snapshot of unit monthly rent in EGP."
+        },
+        "commissionRatePct": {
+          "type": "number",
+          "description": "Active one-time brokerage commission percentage applied at contract signing."
+        },
+        "totalRentEgp": {
+          "type": "number",
+          "description": "Total contract value paid into escrow (unitPriceEgp * unitsCount)."
+        },
+        "platformCommissionEgp": {
+          "type": "number",
+          "description": "One-time brokerage commission locked once at source ((unitPriceEgp * commissionRatePct) / 100)."
+        },
+        "landlordNetEgp": {
+          "type": "number",
+          "description": "Net payout to landlord (totalRentEgp - platformCommissionEgp)."
+        },
+        "paymentCurrency": {
+          "type": "string",
+          "enum": ["EGP", "USD", "SAR", "EUR", "AED"],
+          "maxLength": 10,
+          "description": "Currency selected in EscrowCheckoutModal."
+        },
+        "exchangeRateToEgp": {
+          "type": "number",
+          "description": "Reference exchange rate from 1 unit of paymentCurrency to EGP."
+        },
+        "paidAmountInCurrency": {
+          "type": "number",
+          "description": "Total contract amount converted into paymentCurrency."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["card_meeza", "instapay", "mobile_wallet", "fawry"],
+          "maxLength": 20,
+          "description": "Selected Egyptian payment channel."
+        },
+        "paymentReference": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Escrow gateway transaction reference ID."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["escrow_paid", "completed"],
+          "maxLength": 20,
+          "description": "Escrow settlement lifecycle status."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "apartmentId",
+        "apartmentTitle",
+        "category",
+        "governorate",
+        "tenantId",
+        "tenantDisplayName",
+        "landlordId",
+        "rentalUnit",
+        "unitPriceEgp",
+        "unitsCount",
+        "bedsBooked",
+        "leaseMonths",
+        "monthlyRentEgp",
+        "commissionRatePct",
+        "totalRentEgp",
+        "platformCommissionEgp",
+        "landlordNetEgp",
+        "paymentMethod",
+        "paymentReference",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Verified tenant rating and text review permanently tied to the landlord's account.",
+      "type": "object",
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Verified booking ID (1-to-1 with review document ID)."
+        },
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Rented property ID."
+        },
+        "apartmentTitle": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 120,
+          "description": "Snapshot of rented property title."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Snapshot of property governorate."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the landlord's account."
+        },
+        "landlordDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the landlord."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the reviewing tenant."
+        },
+        "tenantDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the reviewing tenant."
+        },
+        "rating": {
+          "type": "number",
+          "description": "Unit quality and accuracy star rating (1 to 5)."
+        },
+        "landlordRating": {
+          "type": "number",
+          "description": "Landlord account honesty and handover rating (1 to 5)."
+        },
+        "landlordVerdict": {
+          "type": "string",
+          "enum": ["trusted", "acceptable", "unreliable"],
+          "maxLength": 20,
+          "description": "Tenant verdict on whether the landlord's account is trustworthy."
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 800,
+          "description": "Written tenant review describing their experience."
+        },
+        "visibilityStatus": {
+          "type": "string",
+          "enum": ["published", "hidden"],
+          "maxLength": 20,
+          "description": "Moderation visibility status for public queries."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "bookingId",
+        "apartmentId",
+        "apartmentTitle",
+        "governorate",
+        "landlordId",
+        "landlordDisplayName",
+        "tenantId",
+        "tenantDisplayName",
+        "rating",
+        "landlordRating",
+        "landlordVerdict",
+        "comment",
+        "visibilityStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "User-saved favorite property bookmark storing public listing snapshot metadata and optional price-drop alert subscription with zero PII.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the user who saved the unit."
+        },
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Saved property document ID."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Snapshot of property sector category."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 120,
+          "description": "Snapshot of property title."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Snapshot of Egyptian governorate name."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Snapshot of neighborhood or district."
+        },
+        "dailyRateEgp": {
+          "type": "number",
+          "description": "Snapshot of daily stay rate in EGP if applicable."
+        },
+        "monthlyRentEgp": {
+          "type": "number",
+          "description": "Snapshot of monthly rent in Egyptian Pounds."
+        },
+        "studentBedsCount": {
+          "type": "number",
+          "description": "Snapshot of student beds count."
+        },
+        "studentPricePerBedEgp": {
+          "type": "number",
+          "description": "Snapshot of student bed monthly price."
+        },
+        "priceAlertEnabled": {
+          "type": "boolean",
+          "description": "Whether the user opted in to receive notifications if daily or monthly rent drops."
+        },
+        "baselineMonthlyRentEgp": {
+          "type": "number",
+          "description": "Baseline monthly rent in EGP recorded when watching for price drops."
+        },
+        "baselineDailyRateEgp": {
+          "type": "number",
+          "description": "Baseline daily rate in EGP recorded when watching for price drops."
+        },
+        "lastAlertedRentEgp": {
+          "type": "number",
+          "description": "Most recent discounted rent in EGP for which an alert was dispatched."
+        },
+        "bedrooms": {
+          "type": "number",
+          "description": "Snapshot of bedroom count."
+        },
+        "bathrooms": {
+          "type": "number",
+          "description": "Snapshot of bathroom count."
+        },
+        "areaSqm": {
+          "type": "number",
+          "description": "Snapshot of area in square meters."
+        },
+        "furnishing": {
+          "type": "string",
+          "enum": ["furnished", "semi_furnished", "unfurnished"],
+          "maxLength": 20,
+          "description": "Snapshot of furnishing type."
+        },
+        "imageKey": {
+          "type": "string",
+          "enum": [
+            "zamalek_nile",
+            "new_cairo_penthouse",
+            "alexandria_corniche",
+            "sheikh_zayed_duplex",
+            "maadi_garden",
+            "hotel_cairo_suite",
+            "hotel_redsea_room",
+            "factory_industrial_egypt",
+            "student_housing_cairo"
+          ],
+          "maxLength": 40,
+          "description": "Snapshot of verified architectural image identifier."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Landlord account UID."
+        },
+        "ownerDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the landlord."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the property was added to favorites."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest favorite or price-alert update."
+        }
+      },
+      "required": [
+        "userId",
+        "apartmentId",
+        "title",
+        "governorate",
+        "district",
+        "monthlyRentEgp",
+        "bedrooms",
+        "bathrooms",
+        "areaSqm",
+        "furnishing",
+        "imageKey",
+        "ownerId",
+        "ownerDisplayName",
+        "createdAt"
+      ]
+    },
+    "TenantVerification": {
+      "title": "TenantVerification",
+      "description": "Non-PII tenant identity verification status record reviewed and approved by the Ejar project team.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the tenant."
+        },
+        "tenantDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Display name of the tenant."
+        },
+        "tenantCategory": {
+          "type": "string",
+          "enum": ["family", "student", "corporate"],
+          "maxLength": 20,
+          "description": "Tenant classification (family, university student, or corporate/industrial)."
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["pending_review", "verified", "rejected"],
+          "maxLength": 20,
+          "description": "Project team review decision."
+        },
+        "reviewNote": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300,
+          "description": "Optional note from the Ejar verification team."
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Initial KYC submission timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Latest status update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "tenantDisplayName",
+        "tenantCategory",
+        "verificationStatus",
+        "reviewNote",
+        "submittedAt",
+        "updatedAt"
+      ]
+    },
+    "TenantKycPrivate": {
+      "title": "TenantKycPrivate",
+      "description": "Strictly isolated PII identity verification documents for tenants, readable only by the tenant or the verified Platform Admin.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the tenant."
+        },
+        "fullLegalName": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 80,
+          "description": "Quadruple Arabic legal name matching the National ID."
+        },
+        "nationalIdNumber": {
+          "type": "string",
+          "minLength": 14,
+          "maxLength": 14,
+          "pattern": "^[23][0-9]{13}$",
+          "description": "14-digit Egyptian National ID."
+        },
+        "tenantPhone": {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 11,
+          "pattern": "^01[0125][0-9]{8}$",
+          "description": "11-digit Egyptian mobile number."
+        },
+        "occupationOrUniversity": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Employer, university & faculty (for students), or commercial registry."
+        },
+        "idCardFileName": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Uploaded National ID image/PDF filename."
+        },
+        "idCardSha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 cryptographic hash of National ID file."
+        },
+        "supportingDocFileName": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Uploaded university ID, HR letter, or commercial register filename."
+        },
+        "supportingDocSha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 cryptographic hash of supporting document."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of KYC private upload."
+        }
+      },
+      "required": [
+        "userId",
+        "fullLegalName",
+        "nationalIdNumber",
+        "tenantPhone",
+        "occupationOrUniversity",
+        "idCardFileName",
+        "idCardSha256",
+        "supportingDocFileName",
+        "supportingDocSha256",
+        "updatedAt"
+      ]
+    },
+    "RentalRequest": {
+      "title": "RentalRequest",
+      "description": "Transparent pre-settlement rental request tracking approval, pending payment, escrow completion, or cancellation.",
+      "type": "object",
+      "properties": {
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Target property document ID."
+        },
+        "apartmentTitle": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 120,
+          "description": "Snapshot of property title."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Property sector category."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Egyptian governorate name."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "City or neighborhood district."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of requesting tenant."
+        },
+        "tenantDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of requesting tenant."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of property landlord."
+        },
+        "landlordDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of property landlord."
+        },
+        "rentalUnit": {
+          "type": "string",
+          "enum": ["month", "day", "student_bed"],
+          "maxLength": 20,
+          "description": "Selected billing unit."
+        },
+        "unitPriceEgp": {
+          "type": "number",
+          "description": "Base rate per period in EGP."
+        },
+        "unitsCount": {
+          "type": "number",
+          "description": "Requested number of months or days (1 to 365)."
+        },
+        "bedsBooked": {
+          "type": "number",
+          "description": "Requested number of student beds (0 when not student_bed)."
+        },
+        "commissionRatePct": {
+          "type": "number",
+          "description": "Active one-time brokerage commission percentage at request creation."
+        },
+        "totalRentEgp": {
+          "type": "number",
+          "description": "Total contract value in EGP."
+        },
+        "platformCommissionEgp": {
+          "type": "number",
+          "description": "One-time brokerage commission in EGP."
+        },
+        "landlordNetEgp": {
+          "type": "number",
+          "description": "Net landlord share in EGP."
+        },
+        "paymentCurrency": {
+          "type": "string",
+          "enum": ["EGP", "USD", "SAR", "EUR", "AED"],
+          "maxLength": 10,
+          "description": "Optional selected checkout currency."
+        },
+        "exchangeRateToEgp": {
+          "type": "number",
+          "description": "Optional exchange rate snapshot to EGP."
+        },
+        "paidAmountInCurrency": {
+          "type": "number",
+          "description": "Optional converted contract total in paymentCurrency."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending_approval",
+            "awaiting_payment",
+            "approved",
+            "cancelled"
+          ],
+          "maxLength": 25,
+          "description": "Lifecycle status of the rental request."
+        },
+        "statusNote": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300,
+          "description": "Human-readable explanation of current request status."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "apartmentId",
+        "apartmentTitle",
+        "category",
+        "governorate",
+        "district",
+        "tenantId",
+        "tenantDisplayName",
+        "landlordId",
+        "landlordDisplayName",
+        "rentalUnit",
+        "unitPriceEgp",
+        "unitsCount",
+        "bedsBooked",
+        "commissionRatePct",
+        "totalRentEgp",
+        "platformCommissionEgp",
+        "landlordNetEgp",
+        "status",
+        "statusNote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User-scoped transparent rental request, contract status, and favorite price-drop notification with zero PII.",
+      "type": "object",
+      "properties": {
+        "recipientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the notification recipient."
+        },
+        "actorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the user who triggered the status event."
+        },
+        "actorDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the triggering actor."
+        },
+        "recipientRole": {
+          "type": "string",
+          "enum": ["tenant", "landlord"],
+          "maxLength": 20,
+          "description": "Role context in My Contracts panel."
+        },
+        "statusType": {
+          "type": "string",
+          "enum": [
+            "approved",
+            "awaiting_payment",
+            "cancelled",
+            "pending_approval",
+            "price_drop",
+            "chat_unlocked"
+          ],
+          "maxLength": 25,
+          "description": "Notification event category including favorite price-drop and chat unlock alerts."
+        },
+        "relatedEntityType": {
+          "type": "string",
+          "enum": ["rental_request", "booking", "apartment", "kyc", "favorite", "chat_thread"],
+          "maxLength": 25,
+          "description": "Source entity type audited by relational security rules."
+        },
+        "relatedEntityId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Document ID of the related rental request, booking, apartment, KYC, or favorite record."
+        },
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Related property ID."
+        },
+        "apartmentTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Snapshot of property or verification title."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Snapshot of Egyptian governorate."
+        },
+        "amountEgp": {
+          "type": "number",
+          "description": "Associated contract, request, or new discounted rent amount in EGP."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 140,
+          "description": "Notification headline."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500,
+          "description": "Detailed status message explaining next steps."
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Whether the recipient has marked the notification as read."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "recipientId",
+        "actorId",
+        "actorDisplayName",
+        "recipientRole",
+        "statusType",
+        "relatedEntityType",
+        "relatedEntityId",
+        "apartmentId",
+        "apartmentTitle",
+        "governorate",
+        "amountEgp",
+        "title",
+        "message",
+        "isRead",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BannedUser": {
+      "title": "BannedUser",
+      "description": "PII-free user ban record enforced in real time across user pages and Firestore security rules.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Banned user UID or account identifier."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the banned account (zero PII)."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300,
+          "description": "Moderation reason for banning the account."
+        },
+        "hideListings": {
+          "type": "boolean",
+          "description": "Whether all listings and reviews from this user are hidden on public pages."
+        },
+        "bannedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the platform admin who issued the ban."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the ban was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the ban was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "reason",
+        "hideListings",
+        "bannedByUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminActivityLog": {
+      "title": "AdminActivityLog",
+      "description": "Immutable, PII-free administrative audit log tracking sensitive actions such as commission rate changes, user bans, listing removals, and moderation updates.",
+      "type": "object",
+      "properties": {
+        "actionType": {
+          "type": "string",
+          "enum": [
+            "commission_change",
+            "settings_change",
+            "user_ban",
+            "user_unban",
+            "listing_removed",
+            "listing_status",
+            "listing_edited",
+            "moderation_action"
+          ],
+          "maxLength": 40,
+          "description": "Category of sensitive administrative action."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "critical"],
+          "maxLength": 15,
+          "description": "Audit severity level."
+        },
+        "targetType": {
+          "type": "string",
+          "enum": [
+            "platform_settings",
+            "user",
+            "apartment",
+            "review",
+            "rental_request",
+            "booking",
+            "kyc"
+          ],
+          "maxLength": 30,
+          "description": "Entity type affected by the administrative action."
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Identifier of the affected target entity."
+        },
+        "targetLabel": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160,
+          "description": "Public, PII-free human-readable label of the affected target."
+        },
+        "summaryAr": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 400,
+          "description": "Arabic human-readable summary of the administrative action."
+        },
+        "summaryEn": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 400,
+          "description": "English human-readable summary of the administrative action."
+        },
+        "previousValue": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Snapshot of previous setting/status before the change."
+        },
+        "newValue": {
+          "type": "string",
+          "maxLength": 240,
+          "description": "Snapshot of new setting/status after the change."
+        },
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the Platform Admin who performed the action."
+        },
+        "actorDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the Platform Admin (zero PII)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server timestamp when the audit log entry was recorded."
+        }
+      },
+      "required": [
+        "actionType",
+        "severity",
+        "targetType",
+        "targetId",
+        "targetLabel",
+        "summaryAr",
+        "summaryEn",
+        "previousValue",
+        "newValue",
+        "actorUid",
+        "actorDisplayName",
+        "createdAt"
+      ]
+    },
+    "BookingDemandSignal": {
+      "title": "BookingDemandSignal",
+      "description": "Zero-PII anonymized spatial demand signal derived atomically from completed rental contracts (status == 'completed') to power the public Egypt Governorate Residential Demand Heatmap.",
+      "type": "object",
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Source completed booking ID (1-to-1 with document ID)."
+        },
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Rented property identifier."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Property sector category."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Egyptian governorate name."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Neighborhood or city district."
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate inside Egypt (22.0 to 31.8)."
+        },
+        "lng": {
+          "type": "number",
+          "description": "Longitude coordinate inside Egypt (24.5 to 37.0)."
+        },
+        "unitsCount": {
+          "type": "number",
+          "description": "Completed lease duration units count (1 to 365)."
+        },
+        "totalRentEgp": {
+          "type": "number",
+          "description": "Total completed contract value in EGP."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed"],
+          "maxLength": 20,
+          "description": "Completed contract lifecycle marker."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "bookingId",
+        "apartmentId",
+        "category",
+        "governorate",
+        "district",
+        "lat",
+        "lng",
+        "unitsCount",
+        "totalRentEgp",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatThread": {
+      "title": "ChatThread",
+      "description": "Privacy-enforced tenant-landlord chat channel tracking anti-circumvention violation strikes and platform commission unlock status.",
+      "type": "object",
+      "properties": {
+        "apartmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Target property identifier."
+        },
+        "apartmentTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Snapshot of property title."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "family_apartment",
+            "student_housing",
+            "hotel_room",
+            "industrial_factory",
+            "whole_house"
+          ],
+          "maxLength": 30,
+          "description": "Property sector category."
+        },
+        "governorate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 50,
+          "description": "Property governorate."
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Property district."
+        },
+        "baseUnitPriceEgp": {
+          "type": "number",
+          "description": "Base cycle rental rate in EGP used to compute commission unlock fee."
+        },
+        "commissionRatePct": {
+          "type": "number",
+          "description": "Active platform commission percentage for this category."
+        },
+        "commissionAmountEgp": {
+          "type": "number",
+          "description": "Required site brokerage commission in EGP to unlock full chat and phone reveal."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the tenant."
+        },
+        "tenantDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the tenant."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the landlord (or showcase_owner)."
+        },
+        "landlordDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Public display name of the landlord."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["restricted_pre_payment", "unlocked", "flagged_violation"],
+          "maxLength": 30,
+          "description": "Privacy and commission gate status."
+        },
+        "commissionPaid": {
+          "type": "boolean",
+          "description": "Whether site brokerage commission has been paid to unlock phone exchange."
+        },
+        "commissionPaymentMethod": {
+          "type": "string",
+          "enum": ["card_meeza", "instapay", "mobile_wallet", "fawry"],
+          "maxLength": 25,
+          "description": "Payment channel used for unlocking commission."
+        },
+        "commissionPaymentRef": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40,
+          "description": "Commission settlement reference number."
+        },
+        "commissionPaidByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID that settled the site commission."
+        },
+        "commissionPaidAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when site commission was settled."
+        },
+        "bookingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Optional associated booking ID if unlocked via full escrow."
+        },
+        "tenantViolationCount": {
+          "type": "number",
+          "description": "Number of blocked phone/contact sharing attempts by the tenant."
+        },
+        "landlordViolationCount": {
+          "type": "number",
+          "description": "Number of blocked phone/contact sharing attempts by the landlord."
+        },
+        "lastViolationSenderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of participant who triggered latest phone-bypass violation."
+        },
+        "lastViolationReason": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Summary of latest detected phone-bypass attempt (no phone digits stored)."
+        },
+        "lastViolationAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of latest violation attempt."
+        },
+        "lastMessagePreview": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Safe preview of latest message (zero phone PII)."
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest message."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "apartmentId",
+        "apartmentTitle",
+        "category",
+        "governorate",
+        "district",
+        "baseUnitPriceEgp",
+        "commissionRatePct",
+        "commissionAmountEgp",
+        "tenantId",
+        "tenantDisplayName",
+        "landlordId",
+        "landlordDisplayName",
+        "status",
+        "commissionPaid",
+        "tenantViolationCount",
+        "landlordViolationCount",
+        "lastMessagePreview",
+        "lastMessageAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Immutable chat message between tenant and landlord protected by anti-phone-leak guards prior to commission settlement.",
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent chat thread document ID."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Denormalized tenant UID for zero-get list security rules."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Denormalized landlord UID for zero-get list security rules."
+        },
+        "senderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the sender."
+        },
+        "senderRole": {
+          "type": "string",
+          "enum": ["tenant", "landlord", "system"],
+          "maxLength": 15,
+          "description": "Role of sender inside this thread."
+        },
+        "senderDisplayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Display name of sender."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Message text content."
+        },
+        "isSystemNotice": {
+          "type": "boolean",
+          "description": "Whether message is a platform status/unlock notice."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        }
+      },
+      "required": [
+        "threadId",
+        "tenantId",
+        "landlordId",
+        "senderId",
+        "senderRole",
+        "senderDisplayName",
+        "body",
+        "isSystemNotice",
+        "createdAt"
+      ]
+    },
+    "ChatContactExchange": {
+      "title": "ChatContactExchange",
+      "description": "Strictly PII-isolated verified Egyptian mobile numbers unlocked ONLY after platform commissionPaid == true.",
+      "type": "object",
+      "properties": {
+        "threadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent chat thread ID."
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent tenant UID."
+        },
+        "landlordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent landlord UID."
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID of this contact record."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["tenant", "landlord"],
+          "maxLength": 15,
+          "description": "Participant role."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 11,
+          "pattern": "^01[0125][0-9]{8}$",
+          "description": "Verified 11-digit Egyptian mobile number revealed strictly after commission settlement."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "threadId",
+        "tenantId",
+        "landlordId",
+        "userId",
+        "role",
+        "phoneNumber",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/platformSettings/{configId}": {
+      "schema": "PlatformSettings",
+      "description": "Singleton global platform configuration (/platformSettings/config) writable strictly by the verified Platform Admin."
+    },
+    "/apartments/{apartmentId}": {
+      "schema": "Apartment",
+      "description": "Publicly searchable multi-sector property listings without PII; deleted atomically upon rental or admin removal."
+    },
+    "/apartments/{apartmentId}/legalDocs/{docId}": {
+      "schema": "LegalDossier",
+      "description": "Strictly isolated PII landlord ownership documents and brokerage mandate."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Escrow rental contracts enforcing the dynamic one-time brokerage commission and FX snapshot."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Public verified tenant reviews permanently tied to landlord accounts."
+    },
+    "/favorites/{favoriteId}": {
+      "schema": "Favorite",
+      "description": "Private user-scoped saved unit bookmarks with price-drop alert tracking readable and writable only by their owner."
+    },
+    "/tenantVerifications/{userId}": {
+      "schema": "TenantVerification",
+      "description": "Tenant identity verification status queue reviewed by the Ejar project team."
+    },
+    "/tenantVerifications/{userId}/privateDocs/{docId}": {
+      "schema": "TenantKycPrivate",
+      "description": "Strictly isolated PII tenant National ID and university/work credentials."
+    },
+    "/rentalRequests/{requestId}": {
+      "schema": "RentalRequest",
+      "description": "Rental requests tracking pending approval, awaiting payment, escrow approval, and cancellations."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Recipient-isolated rental request, contract lifecycle, and favorite price-drop notifications."
+    },
+    "/bannedUsers/{userId}": {
+      "schema": "BannedUser",
+      "description": "PII-free banned user registry writable strictly by the verified Platform Admin and enforced across writes and public feeds."
+    },
+    "/adminActivityLogs/{logId}": {
+      "schema": "AdminActivityLog",
+      "description": "Immutable, append-only administrative activity log readable and creatable strictly by the verified Platform Admin (update/delete forbidden)."
+    },
+    "/bookingDemandSignals/{bookingId}": {
+      "schema": "BookingDemandSignal",
+      "description": "Zero-PII spatial demand signals verified against completed /bookings/{bookingId} documents for the public Egypt Residential Demand Heatmap."
+    },
+    "/chatThreads/{threadId}": {
+      "schema": "ChatThread",
+      "description": "Participant-isolated tenant-landlord chat thread gated by platform brokerage commission payment."
+    },
+    "/chatThreads/{threadId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Immutable chat messages with server-side anti-phone-leak enforcement prior to commission payment."
+    },
+    "/chatThreads/{threadId}/contactExchange/{roleDoc}": {
+      "schema": "ChatContactExchange",
+      "description": "Strictly PII-isolated phone number vault readable by the counterparty only when parent thread commissionPaid == true."
+    }
+  }
+}

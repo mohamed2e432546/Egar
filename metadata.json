@@ -1,0 +1,10 @@
+{
+  "name": "مفتاح مصر | Meftah Misr",
+  "description": "منصة مفتاح مصر لإيجار الشقق الموثقة في جميع محافظات مصر عبر الخريطة التفاعلية مع توثيق عقود الملكية وبوابة دفع ضامنة لحماية المالك والمستأجر وضمان عمولة المنصة.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

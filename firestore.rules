@@ -1,0 +1,2363 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Phase 3: Hardened Global Primitives
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == '12mohamed01234@gmail.com';
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isNotBanned() {
+      return isSignedIn() && !exists(/databases/$(database)/documents/bannedUsers/$(request.auth.uid));
+    }
+
+    function activeCommissionRate() {
+      return exists(/databases/$(database)/documents/platformSettings/config)
+        ? get(/databases/$(database)/documents/platformSettings/config).data.commissionRatePct
+        : 10;
+    }
+
+    function resolveCategoryCommissionFromConfig(cfg, cat) {
+      return (cat == 'family_apartment' && ('familyApartmentCommissionPct' in cfg))
+        ? cfg.familyApartmentCommissionPct
+        : (cat == 'hotel_room' && ('hotelRoomCommissionPct' in cfg))
+          ? cfg.hotelRoomCommissionPct
+          : (cat == 'industrial_factory' && ('industrialFactoryCommissionPct' in cfg))
+            ? cfg.industrialFactoryCommissionPct
+            : (cat == 'student_housing' && ('studentHousingCommissionPct' in cfg))
+              ? cfg.studentHousingCommissionPct
+              : (cat == 'whole_house' && ('wholeHouseCommissionPct' in cfg))
+                ? cfg.wholeHouseCommissionPct
+                : cfg.commissionRatePct;
+    }
+
+    function activeCommissionRateForCategory(cat) {
+      return exists(/databases/$(database)/documents/platformSettings/config)
+        ? resolveCategoryCommissionFromConfig(
+            get(/databases/$(database)/documents/platformSettings/config).data,
+            cat
+          )
+        : 10;
+    }
+
+    function areNewListingsAllowed() {
+      return isBootstrappedAdmin()
+        || !exists(/databases/$(database)/documents/platformSettings/config)
+        || !('allowNewListings' in get(/databases/$(database)/documents/platformSettings/config).data)
+        || get(/databases/$(database)/documents/platformSettings/config).data.allowNewListings == true;
+    }
+
+    function areNewBookingsAllowed() {
+      return isBootstrappedAdmin()
+        || !exists(/databases/$(database)/documents/platformSettings/config)
+        || !('allowNewBookings' in get(/databases/$(database)/documents/platformSettings/config).data)
+        || get(/databases/$(database)/documents/platformSettings/config).data.allowNewBookings == true;
+    }
+
+    function isValidCurrency(cur) {
+      return cur is string
+        && cur.size() >= 3
+        && cur.size() <= 10
+        && cur in ['EGP', 'USD', 'SAR', 'EUR', 'AED'];
+    }
+
+    function isValidPanoramaKey(k) {
+      return k is string
+        && k.size() <= 60
+        && k in [
+          'none',
+          'cairo_nile_360',
+          'new_cairo_penthouse_360',
+          'hotel_suite_360',
+          'redsea_resort_360'
+        ];
+    }
+
+    function isValidImageKey(key) {
+      return key is string
+        && key.size() <= 40
+        && key in [
+          'zamalek_nile',
+          'new_cairo_penthouse',
+          'alexandria_corniche',
+          'sheikh_zayed_duplex',
+          'maadi_garden',
+          'hotel_cairo_suite',
+          'hotel_redsea_room',
+          'factory_industrial_egypt',
+          'student_housing_cairo'
+        ];
+    }
+
+    function isValidCategory(cat) {
+      return cat is string
+        && cat.size() <= 30
+        && cat in [
+          'family_apartment',
+          'student_housing',
+          'hotel_room',
+          'industrial_factory',
+          'whole_house'
+        ];
+    }
+
+    function isShowcaseApartmentId(aptId) {
+      return aptId in [
+        'apt_zamalek_nile_01',
+        'apt_new_cairo_02',
+        'apt_alex_gleem_03',
+        'apt_zayed_duplex_04',
+        'apt_maadi_sarayat_05',
+        'apt_hurghada_gouna_06',
+        'apt_mansoura_nile_07',
+        'apt_aswan_corniche_08',
+        'apt_heliopolis_korba_09',
+        'apt_dokki_studio_10',
+        'stu_new_cairo_auc_11',
+        'stu_dokki_cairo_uni_12',
+        'stu_smouha_alex_13',
+        'htl_cairo_nile_suite_14',
+        'htl_hurghada_resort_15',
+        'htl_alex_stanley_16',
+        'fac_tenth_ramadan_17',
+        'fac_october_ind_18',
+        'hse_maadi_sarayat_19',
+        'hse_alex_kafr_abdo_20'
+      ];
+    }
+
+    // =========================================================================
+    // Validation Blueprint 0: PlatformSettings (/platformSettings/config)
+    // =========================================================================
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll([
+          'commissionRatePct',
+          'commissionModel',
+          'updatedByUid',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'commissionRatePct',
+          'familyApartmentCommissionPct',
+          'hotelRoomCommissionPct',
+          'industrialFactoryCommissionPct',
+          'studentHousingCommissionPct',
+          'wholeHouseCommissionPct',
+          'commissionModel',
+          'escrowProtectionFeePct',
+          'tenantDiscountPct',
+          'usdRateEgp',
+          'sarRateEgp',
+          'eurRateEgp',
+          'aedRateEgp',
+          'announcementText',
+          'allowNewListings',
+          'allowNewBookings',
+          'removedShowcaseIds',
+          'updatedByUid',
+          'updatedAt'
+        ])
+        && data.commissionRatePct is int
+        && data.commissionRatePct >= 1
+        && data.commissionRatePct <= 50
+        && (!('familyApartmentCommissionPct' in data) || (data.familyApartmentCommissionPct is int && data.familyApartmentCommissionPct >= 1 && data.familyApartmentCommissionPct <= 50))
+        && (!('hotelRoomCommissionPct' in data) || (data.hotelRoomCommissionPct is int && data.hotelRoomCommissionPct <= 50 && data.hotelRoomCommissionPct >= 1))
+        && (!('industrialFactoryCommissionPct' in data) || (data.industrialFactoryCommissionPct is int && data.industrialFactoryCommissionPct >= 1 && data.industrialFactoryCommissionPct <= 50))
+        && (!('studentHousingCommissionPct' in data) || (data.studentHousingCommissionPct is int && data.studentHousingCommissionPct >= 1 && data.studentHousingCommissionPct <= 50))
+        && (!('wholeHouseCommissionPct' in data) || (data.wholeHouseCommissionPct is int && data.wholeHouseCommissionPct >= 1 && data.wholeHouseCommissionPct <= 50))
+        && data.commissionModel is string
+        && data.commissionModel.size() <= 30
+        && data.commissionModel == 'one_time_brokerage'
+        && (!('escrowProtectionFeePct' in data) || (data.escrowProtectionFeePct is number && data.escrowProtectionFeePct >= 0 && data.escrowProtectionFeePct <= 25))
+        && (!('tenantDiscountPct' in data) || (data.tenantDiscountPct is number && data.tenantDiscountPct >= 0 && data.tenantDiscountPct <= 50))
+        && (!('usdRateEgp' in data) || (data.usdRateEgp is number && data.usdRateEgp >= 1 && data.usdRateEgp <= 1000))
+        && (!('sarRateEgp' in data) || (data.sarRateEgp is number && data.sarRateEgp >= 1 && data.sarRateEgp <= 1000))
+        && (!('eurRateEgp' in data) || (data.eurRateEgp is number && data.eurRateEgp >= 1 && data.eurRateEgp <= 1000))
+        && (!('aedRateEgp' in data) || (data.aedRateEgp is number && data.aedRateEgp >= 1 && data.aedRateEgp <= 1000))
+        && (!('announcementText' in data) || (data.announcementText is string && data.announcementText.size() <= 300))
+        && (!('allowNewListings' in data) || (data.allowNewListings is bool))
+        && (!('allowNewBookings' in data) || (data.allowNewBookings is bool))
+        && (
+          !('removedShowcaseIds' in data)
+          || (
+            data.removedShowcaseIds is list
+            && data.removedShowcaseIds.size() <= 50
+            && (
+              data.removedShowcaseIds.size() == 0
+              || (data.removedShowcaseIds[0] is string && data.removedShowcaseIds[0].size() <= 128)
+            )
+          )
+        )
+        && isValidId(data.updatedByUid)
+        && data.updatedByUid == request.auth.uid
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 9: BannedUser (/bannedUsers/{userId})
+    // =========================================================================
+    function isValidBannedUser(data) {
+      return data.keys().hasAll([
+          'userId',
+          'displayName',
+          'reason',
+          'hideListings',
+          'bannedByUid',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'displayName',
+          'reason',
+          'hideListings',
+          'bannedByUid',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.displayName is string
+        && data.displayName.size() >= 2
+        && data.displayName.size() <= 80
+        && data.reason is string
+        && data.reason.size() >= 3
+        && data.reason.size() <= 300
+        && data.hideListings is bool
+        && isValidId(data.bannedByUid)
+        && data.bannedByUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 10: AdminActivityLog (/adminActivityLogs/{logId})
+    // =========================================================================
+    function isValidAdminActivityLog(data) {
+      return data.keys().hasAll([
+          'actionType',
+          'severity',
+          'targetType',
+          'targetId',
+          'targetLabel',
+          'summaryAr',
+          'summaryEn',
+          'previousValue',
+          'newValue',
+          'actorUid',
+          'actorDisplayName',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'actionType',
+          'severity',
+          'targetType',
+          'targetId',
+          'targetLabel',
+          'summaryAr',
+          'summaryEn',
+          'previousValue',
+          'newValue',
+          'actorUid',
+          'actorDisplayName',
+          'createdAt'
+        ])
+        && data.actionType is string
+        && data.actionType.size() >= 3
+        && data.actionType.size() <= 40
+        && data.actionType in [
+          'commission_change',
+          'settings_change',
+          'user_ban',
+          'user_unban',
+          'listing_removed',
+          'listing_status',
+          'listing_edited',
+          'moderation_action'
+        ]
+        && data.severity is string
+        && data.severity.size() >= 4
+        && data.severity.size() <= 15
+        && data.severity in ['info', 'warning', 'critical']
+        && data.targetType is string
+        && data.targetType.size() >= 3
+        && data.targetType.size() <= 30
+        && data.targetType in [
+          'platform_settings',
+          'user',
+          'apartment',
+          'review',
+          'rental_request',
+          'booking',
+          'kyc'
+        ]
+        && isValidId(data.targetId)
+        && data.targetLabel is string
+        && data.targetLabel.size() >= 2
+        && data.targetLabel.size() <= 160
+        && data.summaryAr is string
+        && data.summaryAr.size() >= 4
+        && data.summaryAr.size() <= 400
+        && data.summaryEn is string
+        && data.summaryEn.size() >= 4
+        && data.summaryEn.size() <= 400
+        && data.previousValue is string
+        && data.previousValue.size() <= 240
+        && data.newValue is string
+        && data.newValue.size() <= 240
+        && isValidId(data.actorUid)
+        && data.actorUid == request.auth.uid
+        && data.actorDisplayName is string
+        && data.actorDisplayName.size() >= 2
+        && data.actorDisplayName.size() <= 80
+        && data.createdAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 11: BookingDemandSignal (Zero-PII Completed Demand Heatmap)
+    // =========================================================================
+    function isValidBookingDemandSignal(data, sigId) {
+      return data.keys().hasAll([
+          'bookingId',
+          'apartmentId',
+          'category',
+          'governorate',
+          'district',
+          'lat',
+          'lng',
+          'unitsCount',
+          'totalRentEgp',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'bookingId',
+          'apartmentId',
+          'category',
+          'governorate',
+          'district',
+          'lat',
+          'lng',
+          'unitsCount',
+          'totalRentEgp',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.bookingId)
+        && data.bookingId == sigId
+        && isValidId(data.apartmentId)
+        && isValidCategory(data.category)
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 80
+        && data.lat is number && data.lat >= 22.0 && data.lat <= 31.8
+        && data.lng is number && data.lng >= 24.5 && data.lng <= 37.0
+        && data.unitsCount is int && data.unitsCount >= 1 && data.unitsCount <= 365
+        && data.totalRentEgp is int && data.totalRentEgp >= 300 && data.totalRentEgp <= 500000000
+        && data.status is string && data.status.size() <= 20 && data.status == 'completed'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 1: Apartment (Multi-Sector Property Unit)
+    // =========================================================================
+    function isValidApartment(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'ownerDisplayName',
+          'title',
+          'description',
+          'governorate',
+          'district',
+          'lat',
+          'lng',
+          'monthlyRentEgp',
+          'bedrooms',
+          'bathrooms',
+          'areaSqm',
+          'furnishing',
+          'imageKey',
+          'verificationStatus',
+          'availabilityStatus',
+          'commissionRatePct',
+          'mandateAccepted',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'ownerDisplayName',
+          'category',
+          'billingMode',
+          'baseCurrency',
+          'baseMonthlyPrice',
+          'baseDailyPrice',
+          'baseStudentBedPrice',
+          'dailyRateEgp',
+          'monthlyRentEgp',
+          'studentBedsCount',
+          'studentPricePerBedEgp',
+          'houseApartmentsCount',
+          'houseFloorsCount',
+          'houseHasGardenOrRoof',
+          'houseHasPrivateGarage',
+          'houseSpecsSummary',
+          'title',
+          'description',
+          'governorate',
+          'district',
+          'lat',
+          'lng',
+          'bedrooms',
+          'bathrooms',
+          'areaSqm',
+          'furnishing',
+          'imageKey',
+          'hasVirtualTour',
+          'panorama360Key',
+          'panorama360DataUrl',
+          'virtualTourUrl',
+          'verificationStatus',
+          'availabilityStatus',
+          'commissionRatePct',
+          'mandateAccepted',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerDisplayName is string && data.ownerDisplayName.size() >= 2 && data.ownerDisplayName.size() <= 80
+        && (!('category' in data) || isValidCategory(data.category))
+        && (!('billingMode' in data) || (data.billingMode is string && data.billingMode.size() <= 25 && data.billingMode in ['monthly_only', 'daily_or_monthly']))
+        && (!('baseCurrency' in data) || isValidCurrency(data.baseCurrency))
+        && (!('baseMonthlyPrice' in data) || (data.baseMonthlyPrice is number && data.baseMonthlyPrice >= 0 && data.baseMonthlyPrice <= 5000000))
+        && (!('baseDailyPrice' in data) || (data.baseDailyPrice is number && data.baseDailyPrice >= 0 && data.baseDailyPrice <= 500000))
+        && (!('baseStudentBedPrice' in data) || (data.baseStudentBedPrice is number && data.baseStudentBedPrice >= 0 && data.baseStudentBedPrice <= 100000))
+        && (!('dailyRateEgp' in data) || (data.dailyRateEgp is int && data.dailyRateEgp >= 0 && data.dailyRateEgp <= 500000 && (data.dailyRateEgp % 10 == 0)))
+        && (!('studentBedsCount' in data) || (data.studentBedsCount is int && data.studentBedsCount >= 0 && data.studentBedsCount <= 50))
+        && (!('studentPricePerBedEgp' in data) || (data.studentPricePerBedEgp is int && data.studentPricePerBedEgp >= 0 && data.studentPricePerBedEgp <= 100000 && (data.studentPricePerBedEgp % 10 == 0)))
+        && (!('houseApartmentsCount' in data) || (data.houseApartmentsCount is int && data.houseApartmentsCount >= 0 && data.houseApartmentsCount <= 60))
+        && (!('houseFloorsCount' in data) || (data.houseFloorsCount is int && data.houseFloorsCount >= 0 && data.houseFloorsCount <= 20))
+        && (!('houseHasGardenOrRoof' in data) || (data.houseHasGardenOrRoof is bool))
+        && (!('houseHasPrivateGarage' in data) || (data.houseHasPrivateGarage is bool))
+        && (!('houseSpecsSummary' in data) || (data.houseSpecsSummary is string && data.houseSpecsSummary.size() <= 240))
+        && (
+          !('billingMode' in data && 'dailyRateEgp' in data && 'category' in data)
+          || (
+            data.billingMode == 'daily_or_monthly'
+              ? (data.category in ['hotel_room', 'whole_house'] && data.dailyRateEgp >= 300)
+              : (data.dailyRateEgp == 0)
+          )
+        )
+        && (
+          !('studentBedsCount' in data && 'studentPricePerBedEgp' in data && 'category' in data)
+          || (
+            data.category == 'student_housing'
+              ? (data.studentBedsCount >= 1 && data.studentPricePerBedEgp >= 500)
+              : (
+                data.studentBedsCount == 0
+                  ? data.studentPricePerBedEgp == 0
+                  : data.studentPricePerBedEgp >= 500
+              )
+          )
+        )
+        && data.title is string && data.title.size() >= 5 && data.title.size() <= 120
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 1200
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 80
+        && data.lat is number && data.lat >= 22.0 && data.lat <= 31.8
+        && data.lng is number && data.lng >= 24.5 && data.lng <= 37.0
+        && data.monthlyRentEgp is int && data.monthlyRentEgp >= 1000 && data.monthlyRentEgp <= 5000000 && (data.monthlyRentEgp % 10 == 0)
+        && data.bedrooms is int && data.bedrooms >= 0 && data.bedrooms <= 50
+        && data.bathrooms is int && data.bathrooms >= 1 && data.bathrooms <= 30
+        && data.areaSqm is int && data.areaSqm >= 18 && data.areaSqm <= 100000
+        && data.furnishing is string && data.furnishing.size() <= 20 && data.furnishing in ['furnished', 'semi_furnished', 'unfurnished']
+        && isValidImageKey(data.imageKey)
+        && (!('hasVirtualTour' in data) || (data.hasVirtualTour is bool))
+        && (!('panorama360Key' in data) || isValidPanoramaKey(data.panorama360Key))
+        && (!('panorama360DataUrl' in data) || (data.panorama360DataUrl is string && data.panorama360DataUrl.size() <= 180000))
+        && (!('virtualTourUrl' in data) || (data.virtualTourUrl is string && data.virtualTourUrl.size() <= 300))
+        && data.verificationStatus is string && data.verificationStatus.size() <= 20 && data.verificationStatus in ['pending_review', 'verified', 'rejected']
+        && data.availabilityStatus is string && data.availabilityStatus.size() <= 20 && data.availabilityStatus in ['available', 'rented']
+        && data.commissionRatePct is int && data.commissionRatePct >= 1 && data.commissionRatePct <= 50
+        && data.mandateAccepted is bool && data.mandateAccepted == true
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function hasValidSectorPricingOnCreate(data) {
+      return data.keys().hasAll([
+          'category',
+          'billingMode',
+          'dailyRateEgp',
+          'studentBedsCount',
+          'studentPricePerBedEgp'
+        ])
+        && (
+          data.category != 'whole_house'
+          || ('houseApartmentsCount' in data && data.houseApartmentsCount >= 1)
+        );
+    }
+
+    // =========================================================================
+    // Validation Blueprint 2: LegalDossier (PII Split Subcollection)
+    // =========================================================================
+    function isValidLegalDossier(data, aptId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'apartmentId',
+          'nationalIdNumber',
+          'ownerPhone',
+          'exactAddress',
+          'propertyRegistryNumber',
+          'titleDeedFileName',
+          'titleDeedSha256',
+          'utilityBillFileName',
+          'utilityBillSha256',
+          'ownerIbanOrInstapay',
+          'digitalSignatureName',
+          'exclusivityClauseAccepted',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'apartmentId',
+          'nationalIdNumber',
+          'ownerPhone',
+          'exactAddress',
+          'propertyRegistryNumber',
+          'titleDeedFileName',
+          'titleDeedSha256',
+          'utilityBillFileName',
+          'utilityBillSha256',
+          'ownerIbanOrInstapay',
+          'digitalSignatureName',
+          'exclusivityClauseAccepted',
+          'createdAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.apartmentId)
+        && data.apartmentId == aptId
+        && data.nationalIdNumber is string && data.nationalIdNumber.size() == 14 && data.nationalIdNumber.matches('^[23][0-9]{13}$')
+        && data.ownerPhone is string && data.ownerPhone.size() == 11 && data.ownerPhone.matches('^01[0125][0-9]{8}$')
+        && data.exactAddress is string && data.exactAddress.size() >= 5 && data.exactAddress.size() <= 250
+        && data.propertyRegistryNumber is string && data.propertyRegistryNumber.size() >= 4 && data.propertyRegistryNumber.size() <= 60
+        && data.titleDeedFileName is string && data.titleDeedFileName.size() >= 3 && data.titleDeedFileName.size() <= 120
+        && data.titleDeedSha256 is string && data.titleDeedSha256.size() == 64 && data.titleDeedSha256.matches('^[a-f0-9]{64}$')
+        && data.utilityBillFileName is string && data.utilityBillFileName.size() >= 3 && data.utilityBillFileName.size() <= 120
+        && data.utilityBillSha256 is string && data.utilityBillSha256.size() == 64 && data.utilityBillSha256.matches('^[a-f0-9]{64}$')
+        && data.ownerIbanOrInstapay is string && data.ownerIbanOrInstapay.size() >= 5 && data.ownerIbanOrInstapay.size() <= 80
+        && data.digitalSignatureName is string && data.digitalSignatureName.size() >= 4 && data.digitalSignatureName.size() <= 80
+        && data.exclusivityClauseAccepted is bool && data.exclusivityClauseAccepted == true
+        && data.createdAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 3: Booking (Escrow & One-Time Brokerage Commission)
+    // =========================================================================
+    function isValidBooking(data) {
+      return data.keys().hasAll([
+          'apartmentId',
+          'apartmentTitle',
+          'governorate',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'leaseMonths',
+          'monthlyRentEgp',
+          'totalRentEgp',
+          'platformCommissionEgp',
+          'landlordNetEgp',
+          'paymentMethod',
+          'paymentReference',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'apartmentId',
+          'apartmentTitle',
+          'category',
+          'governorate',
+          'district',
+          'lat',
+          'lng',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'landlordDisplayName',
+          'rentalUnit',
+          'unitPriceEgp',
+          'unitsCount',
+          'bedsBooked',
+          'leaseMonths',
+          'monthlyRentEgp',
+          'commissionRatePct',
+          'totalRentEgp',
+          'platformCommissionEgp',
+          'landlordNetEgp',
+          'paymentCurrency',
+          'exchangeRateToEgp',
+          'paidAmountInCurrency',
+          'paymentMethod',
+          'paymentReference',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.apartmentId)
+        && data.apartmentTitle is string && data.apartmentTitle.size() >= 5 && data.apartmentTitle.size() <= 120
+        && (!('category' in data) || isValidCategory(data.category))
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && (!('district' in data) || (data.district is string && data.district.size() >= 2 && data.district.size() <= 80))
+        && (!('lat' in data) || (data.lat is number && data.lat >= 22.0 && data.lat <= 31.8))
+        && (!('lng' in data) || (data.lng is number && data.lng >= 24.5 && data.lng <= 37.0))
+        && isValidId(data.tenantId)
+        && data.tenantDisplayName is string && data.tenantDisplayName.size() >= 2 && data.tenantDisplayName.size() <= 80
+        && isValidId(data.landlordId)
+        && (!('landlordDisplayName' in data) || (data.landlordDisplayName is string && data.landlordDisplayName.size() >= 2 && data.landlordDisplayName.size() <= 80))
+        && (!('rentalUnit' in data) || (data.rentalUnit is string && data.rentalUnit.size() <= 20 && data.rentalUnit in ['month', 'day', 'student_bed']))
+        && (!('unitPriceEgp' in data) || (data.unitPriceEgp is int && data.unitPriceEgp >= 300 && data.unitPriceEgp <= 5000000))
+        && (!('unitsCount' in data) || (data.unitsCount is int && data.unitsCount >= 1 && data.unitsCount <= 365))
+        && (!('bedsBooked' in data) || (data.bedsBooked is int && data.bedsBooked >= 0 && data.bedsBooked <= 50))
+        && (!('commissionRatePct' in data) || (data.commissionRatePct is int && data.commissionRatePct >= 1 && data.commissionRatePct <= 50))
+        && (!('paymentCurrency' in data) || isValidCurrency(data.paymentCurrency))
+        && (!('exchangeRateToEgp' in data) || (data.exchangeRateToEgp is number && data.exchangeRateToEgp > 0 && data.exchangeRateToEgp <= 1000))
+        && (!('paidAmountInCurrency' in data) || (data.paidAmountInCurrency is number && data.paidAmountInCurrency >= 0 && data.paidAmountInCurrency <= 500000000))
+        && data.leaseMonths is int && data.leaseMonths >= 1 && data.leaseMonths <= 365
+        && data.monthlyRentEgp is int && data.monthlyRentEgp >= 1000 && data.monthlyRentEgp <= 5000000
+        && data.totalRentEgp is int && data.totalRentEgp >= 300
+        && data.platformCommissionEgp is int && data.platformCommissionEgp >= 1
+        && data.landlordNetEgp is int && data.landlordNetEgp >= 0
+        && data.landlordNetEgp + data.platformCommissionEgp == data.totalRentEgp
+        && (
+          ('unitPriceEgp' in data && 'unitsCount' in data && 'commissionRatePct' in data)
+            ? (
+              data.totalRentEgp == data.unitPriceEgp * data.unitsCount
+              && data.platformCommissionEgp == (data.unitPriceEgp * data.commissionRatePct) / 100
+            )
+            : (
+              data.totalRentEgp == data.monthlyRentEgp * data.leaseMonths
+            )
+        )
+        && data.paymentMethod is string && data.paymentMethod.size() <= 20 && data.paymentMethod in ['card_meeza', 'instapay', 'mobile_wallet', 'fawry']
+        && data.paymentReference is string && data.paymentReference.size() >= 6 && data.paymentReference.size() <= 64 && data.paymentReference.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.status is string && data.status.size() <= 20 && data.status in ['escrow_paid', 'completed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function matchesParentUnitRate(booking, apt) {
+      return booking.keys().hasAll([
+          'category',
+          'rentalUnit',
+          'unitPriceEgp',
+          'unitsCount',
+          'bedsBooked',
+          'commissionRatePct'
+        ])
+        && booking.monthlyRentEgp == apt.monthlyRentEgp
+        && (
+          (booking.rentalUnit == 'month' && booking.unitPriceEgp == apt.monthlyRentEgp && booking.bedsBooked == 0)
+          || (booking.rentalUnit == 'day' && ('dailyRateEgp' in apt) && apt.dailyRateEgp > 0 && booking.unitPriceEgp == apt.dailyRateEgp && booking.bedsBooked == 0)
+          || (booking.rentalUnit == 'student_bed' && ('studentPricePerBedEgp' in apt) && apt.studentPricePerBedEgp > 0 && booking.bedsBooked >= 1 && booking.bedsBooked <= apt.studentBedsCount && booking.unitPriceEgp == apt.studentPricePerBedEgp * booking.bedsBooked)
+        );
+    }
+
+    // =========================================================================
+    // Validation Blueprint 4: Review (Verified Tenant Rating on Landlord Account)
+    // =========================================================================
+    function isValidReview(data) {
+      return data.keys().hasAll([
+          'bookingId',
+          'apartmentId',
+          'apartmentTitle',
+          'governorate',
+          'landlordId',
+          'landlordDisplayName',
+          'tenantId',
+          'tenantDisplayName',
+          'rating',
+          'landlordRating',
+          'landlordVerdict',
+          'comment',
+          'visibilityStatus',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'bookingId',
+          'apartmentId',
+          'apartmentTitle',
+          'governorate',
+          'landlordId',
+          'landlordDisplayName',
+          'tenantId',
+          'tenantDisplayName',
+          'rating',
+          'landlordRating',
+          'landlordVerdict',
+          'comment',
+          'visibilityStatus',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.bookingId)
+        && isValidId(data.apartmentId)
+        && data.apartmentTitle is string && data.apartmentTitle.size() >= 5 && data.apartmentTitle.size() <= 120
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && isValidId(data.landlordId)
+        && data.landlordDisplayName is string && data.landlordDisplayName.size() >= 2 && data.landlordDisplayName.size() <= 80
+        && isValidId(data.tenantId)
+        && data.tenantDisplayName is string && data.tenantDisplayName.size() >= 2 && data.tenantDisplayName.size() <= 80
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.landlordRating is int && data.landlordRating <= 5 && data.landlordRating >= 1
+        && data.landlordVerdict is string && data.landlordVerdict.size() <= 20 && data.landlordVerdict in ['trusted', 'acceptable', 'unreliable']
+        && data.comment is string && data.comment.size() >= 10 && data.comment.size() <= 800
+        && data.visibilityStatus is string && data.visibilityStatus.size() <= 20 && data.visibilityStatus in ['published', 'hidden']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 5: Favorite (Private User-Scoped Saved Unit + Price Drop Alert)
+    // =========================================================================
+    function isValidFavorite(data) {
+      return data.keys().hasAll([
+          'userId',
+          'apartmentId',
+          'title',
+          'governorate',
+          'district',
+          'monthlyRentEgp',
+          'bedrooms',
+          'bathrooms',
+          'areaSqm',
+          'furnishing',
+          'imageKey',
+          'ownerId',
+          'ownerDisplayName',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'apartmentId',
+          'category',
+          'title',
+          'governorate',
+          'district',
+          'dailyRateEgp',
+          'monthlyRentEgp',
+          'studentBedsCount',
+          'studentPricePerBedEgp',
+          'priceAlertEnabled',
+          'baselineMonthlyRentEgp',
+          'baselineDailyRateEgp',
+          'lastAlertedRentEgp',
+          'bedrooms',
+          'bathrooms',
+          'areaSqm',
+          'furnishing',
+          'imageKey',
+          'ownerId',
+          'ownerDisplayName',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && isValidId(data.apartmentId)
+        && (!('category' in data) || isValidCategory(data.category))
+        && data.title is string && data.title.size() >= 5 && data.title.size() <= 120
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 80
+        && (!('dailyRateEgp' in data) || (data.dailyRateEgp is int && data.dailyRateEgp >= 0 && data.dailyRateEgp <= 500000))
+        && data.monthlyRentEgp is int && data.monthlyRentEgp >= 1000 && data.monthlyRentEgp <= 5000000
+        && (!('studentBedsCount' in data) || (data.studentBedsCount is int && data.studentBedsCount >= 0 && data.studentBedsCount <= 50))
+        && (!('studentPricePerBedEgp' in data) || (data.studentPricePerBedEgp is int && data.studentPricePerBedEgp >= 0 && data.studentPricePerBedEgp <= 100000))
+        && (!('priceAlertEnabled' in data) || (data.priceAlertEnabled is bool))
+        && (!('baselineMonthlyRentEgp' in data) || (data.baselineMonthlyRentEgp is int && data.baselineMonthlyRentEgp >= 0 && data.baselineMonthlyRentEgp <= 5000000))
+        && (!('baselineDailyRateEgp' in data) || (data.baselineDailyRateEgp is int && data.baselineDailyRateEgp >= 0 && data.baselineDailyRateEgp <= 500000))
+        && (!('lastAlertedRentEgp' in data) || (data.lastAlertedRentEgp is int && data.lastAlertedRentEgp >= 0 && data.lastAlertedRentEgp <= 5000000))
+        && data.bedrooms is int && data.bedrooms >= 0 && data.bedrooms <= 50
+        && data.bathrooms is int && data.bathrooms >= 1 && data.bathrooms <= 30
+        && data.areaSqm is int && data.areaSqm >= 18 && data.areaSqm <= 100000
+        && data.furnishing is string && data.furnishing.size() <= 20 && data.furnishing in ['furnished', 'semi_furnished', 'unfurnished']
+        && isValidImageKey(data.imageKey)
+        && isValidId(data.ownerId)
+        && data.ownerDisplayName is string && data.ownerDisplayName.size() >= 2 && data.ownerDisplayName.size() <= 80
+        && data.createdAt is timestamp
+        && (!('updatedAt' in data) || (data.updatedAt is timestamp));
+    }
+
+    // =========================================================================
+    // Validation Blueprint 6: TenantVerification & TenantKycPrivate (PII Split)
+    // =========================================================================
+    function isValidTenantVerification(data) {
+      return data.keys().hasAll([
+          'userId',
+          'tenantDisplayName',
+          'tenantCategory',
+          'verificationStatus',
+          'reviewNote',
+          'submittedAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'tenantDisplayName',
+          'tenantCategory',
+          'verificationStatus',
+          'reviewNote',
+          'submittedAt',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.tenantDisplayName is string && data.tenantDisplayName.size() >= 2 && data.tenantDisplayName.size() <= 80
+        && data.tenantCategory is string && data.tenantCategory.size() <= 20 && data.tenantCategory in ['family', 'student', 'corporate']
+        && data.verificationStatus is string && data.verificationStatus.size() <= 20 && data.verificationStatus in ['pending_review', 'verified', 'rejected']
+        && data.reviewNote is string && data.reviewNote.size() <= 300
+        && data.submittedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTenantKycPrivate(data, uid) {
+      return data.keys().hasAll([
+          'userId',
+          'fullLegalName',
+          'nationalIdNumber',
+          'tenantPhone',
+          'occupationOrUniversity',
+          'idCardFileName',
+          'idCardSha256',
+          'supportingDocFileName',
+          'supportingDocSha256',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'fullLegalName',
+          'nationalIdNumber',
+          'tenantPhone',
+          'occupationOrUniversity',
+          'idCardFileName',
+          'idCardSha256',
+          'supportingDocFileName',
+          'supportingDocSha256',
+          'updatedAt'
+        ])
+        && isValidId(data.userId)
+        && data.userId == uid
+        && data.userId == request.auth.uid
+        && data.fullLegalName is string && data.fullLegalName.size() >= 4 && data.fullLegalName.size() <= 80
+        && data.nationalIdNumber is string && data.nationalIdNumber.size() == 14 && data.nationalIdNumber.matches('^[23][0-9]{13}$')
+        && data.tenantPhone is string && data.tenantPhone.size() == 11 && data.tenantPhone.matches('^01[0125][0-9]{8}$')
+        && data.occupationOrUniversity is string && data.occupationOrUniversity.size() >= 3 && data.occupationOrUniversity.size() <= 120
+        && data.idCardFileName is string && data.idCardFileName.size() >= 3 && data.idCardFileName.size() <= 120
+        && data.idCardSha256 is string && data.idCardSha256.size() == 64 && data.idCardSha256.matches('^[a-f0-9]{64}$')
+        && data.supportingDocFileName is string && data.supportingDocFileName.size() >= 3 && data.supportingDocFileName.size() <= 120
+        && data.supportingDocSha256 is string && data.supportingDocSha256.size() == 64 && data.supportingDocSha256.matches('^[a-f0-9]{64}$')
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 7: RentalRequest (/rentalRequests/{requestId})
+    // =========================================================================
+    function isValidRentalRequest(data) {
+      return data.keys().hasAll([
+          'apartmentId',
+          'apartmentTitle',
+          'category',
+          'governorate',
+          'district',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'landlordDisplayName',
+          'rentalUnit',
+          'unitPriceEgp',
+          'unitsCount',
+          'bedsBooked',
+          'commissionRatePct',
+          'totalRentEgp',
+          'platformCommissionEgp',
+          'landlordNetEgp',
+          'status',
+          'statusNote',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'apartmentId',
+          'apartmentTitle',
+          'category',
+          'governorate',
+          'district',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'landlordDisplayName',
+          'rentalUnit',
+          'unitPriceEgp',
+          'unitsCount',
+          'bedsBooked',
+          'commissionRatePct',
+          'totalRentEgp',
+          'platformCommissionEgp',
+          'landlordNetEgp',
+          'paymentCurrency',
+          'exchangeRateToEgp',
+          'paidAmountInCurrency',
+          'status',
+          'statusNote',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.apartmentId)
+        && data.apartmentTitle is string && data.apartmentTitle.size() >= 5 && data.apartmentTitle.size() <= 120
+        && isValidCategory(data.category)
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 80
+        && isValidId(data.tenantId)
+        && data.tenantDisplayName is string && data.tenantDisplayName.size() >= 2 && data.tenantDisplayName.size() <= 80
+        && isValidId(data.landlordId)
+        && data.landlordDisplayName is string && data.landlordDisplayName.size() >= 2 && data.landlordDisplayName.size() <= 80
+        && data.rentalUnit is string && data.rentalUnit.size() <= 20 && data.rentalUnit in ['month', 'day', 'student_bed']
+        && data.unitPriceEgp is int && data.unitPriceEgp >= 300 && data.unitPriceEgp <= 5000000
+        && data.unitsCount is int && data.unitsCount >= 1 && data.unitsCount <= 365
+        && data.bedsBooked is int && data.bedsBooked >= 0 && data.bedsBooked <= 50
+        && data.commissionRatePct is int && data.commissionRatePct >= 1 && data.commissionRatePct <= 50
+        && data.totalRentEgp is int && data.totalRentEgp == data.unitPriceEgp * data.unitsCount
+        && data.platformCommissionEgp is int && data.platformCommissionEgp == (data.unitPriceEgp * data.commissionRatePct) / 100
+        && data.landlordNetEgp is int && data.landlordNetEgp >= 0
+        && data.landlordNetEgp + data.platformCommissionEgp == data.totalRentEgp
+        && (!('paymentCurrency' in data) || isValidCurrency(data.paymentCurrency))
+        && (!('exchangeRateToEgp' in data) || (data.exchangeRateToEgp is number && data.exchangeRateToEgp > 0 && data.exchangeRateToEgp <= 1000))
+        && (!('paidAmountInCurrency' in data) || (data.paidAmountInCurrency is number && data.paidAmountInCurrency >= 0 && data.paidAmountInCurrency <= 500000000))
+        && data.status is string && data.status.size() <= 25 && data.status in ['pending_approval', 'awaiting_payment', 'approved', 'cancelled']
+        && data.statusNote is string && data.statusNote.size() >= 2 && data.statusNote.size() <= 300
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Validation Blueprint 8: Notification (/notifications/{notificationId})
+    // =========================================================================
+    function isValidNotification(data) {
+      return data.keys().hasAll([
+          'recipientId',
+          'actorId',
+          'actorDisplayName',
+          'recipientRole',
+          'statusType',
+          'relatedEntityType',
+          'relatedEntityId',
+          'apartmentId',
+          'apartmentTitle',
+          'governorate',
+          'amountEgp',
+          'title',
+          'message',
+          'isRead',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'recipientId',
+          'actorId',
+          'actorDisplayName',
+          'recipientRole',
+          'statusType',
+          'relatedEntityType',
+          'relatedEntityId',
+          'apartmentId',
+          'apartmentTitle',
+          'governorate',
+          'amountEgp',
+          'title',
+          'message',
+          'isRead',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.recipientId)
+        && data.recipientId != 'showcase_owner'
+        && isValidId(data.actorId)
+        && data.actorDisplayName is string && data.actorDisplayName.size() >= 2 && data.actorDisplayName.size() <= 80
+        && data.recipientRole is string && data.recipientRole.size() <= 20 && data.recipientRole in ['tenant', 'landlord']
+        && data.statusType is string && data.statusType.size() <= 25 && data.statusType in ['approved', 'awaiting_payment', 'cancelled', 'pending_approval', 'price_drop', 'chat_unlocked']
+        && data.relatedEntityType is string && data.relatedEntityType.size() <= 25 && data.relatedEntityType in ['rental_request', 'booking', 'apartment', 'kyc', 'favorite', 'chat_thread']
+        && isValidId(data.relatedEntityId)
+        && isValidId(data.apartmentId)
+        && data.apartmentTitle is string && data.apartmentTitle.size() >= 2 && data.apartmentTitle.size() <= 120
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.amountEgp is int && data.amountEgp >= 0 && data.amountEgp <= 500000000
+        && data.title is string && data.title.size() >= 5 && data.title.size() <= 140
+        && data.message is string && data.message.size() >= 10 && data.message.size() <= 500
+        && data.isRead is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function canDeliverNotification(data) {
+      return isBootstrappedAdmin()
+        || (
+          data.relatedEntityType == 'rental_request'
+          && existsAfter(/databases/$(database)/documents/rentalRequests/$(data.relatedEntityId))
+          && (
+            (
+              getAfter(/databases/$(database)/documents/rentalRequests/$(data.relatedEntityId)).data.tenantId == request.auth.uid
+              && (
+                data.recipientId == request.auth.uid
+                || data.recipientId == getAfter(/databases/$(database)/documents/rentalRequests/$(data.relatedEntityId)).data.landlordId
+              )
+            )
+            || (
+              getAfter(/databases/$(database)/documents/rentalRequests/$(data.relatedEntityId)).data.landlordId == request.auth.uid
+              && (
+                data.recipientId == request.auth.uid
+                || data.recipientId == getAfter(/databases/$(database)/documents/rentalRequests/$(data.relatedEntityId)).data.tenantId
+              )
+            )
+          )
+        )
+        || (
+          data.relatedEntityType == 'booking'
+          && existsAfter(/databases/$(database)/documents/bookings/$(data.relatedEntityId))
+          && (
+            (
+              getAfter(/databases/$(database)/documents/bookings/$(data.relatedEntityId)).data.tenantId == request.auth.uid
+              && (
+                data.recipientId == request.auth.uid
+                || data.recipientId == getAfter(/databases/$(database)/documents/bookings/$(data.relatedEntityId)).data.landlordId
+              )
+            )
+            || (
+              getAfter(/databases/$(database)/documents/bookings/$(data.relatedEntityId)).data.landlordId == request.auth.uid
+              && (
+                data.recipientId == request.auth.uid
+                || data.recipientId == getAfter(/databases/$(database)/documents/bookings/$(data.relatedEntityId)).data.tenantId
+              )
+            )
+          )
+        )
+        || (
+          data.relatedEntityType == 'favorite'
+          && data.statusType == 'price_drop'
+          && data.recipientId == request.auth.uid
+          && existsAfter(/databases/$(database)/documents/favorites/$(data.relatedEntityId))
+          && getAfter(/databases/$(database)/documents/favorites/$(data.relatedEntityId)).data.userId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/favorites/$(data.relatedEntityId)).data.priceAlertEnabled == true
+        )
+        || (
+          data.relatedEntityType == 'chat_thread'
+          && data.statusType == 'chat_unlocked'
+          && existsAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId))
+          && getAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId)).data.commissionPaid == true
+          && (
+            (
+              getAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId)).data.tenantId == request.auth.uid
+              && data.recipientId == getAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId)).data.landlordId
+            )
+            || (
+              getAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId)).data.landlordId == request.auth.uid
+              && data.recipientId == getAfter(/databases/$(database)/documents/chatThreads/$(data.relatedEntityId)).data.tenantId
+            )
+          )
+        );
+    }
+
+    // =========================================================================
+    // Validation Blueprint 11: Privacy-Gated Tenant-Landlord Chat
+    // =========================================================================
+    function hasPhoneNumberLeak(txt) {
+      return txt.matches('.*01[0125][0-9\\s\\-\\._()]{8,14}.*')
+        || txt.matches('.*(\\+|00)20[\\s\\-\\._]?1[0125][0-9\\s\\-\\._()]{8,14}.*')
+        || txt.matches('.*[٠-٩۰-۹]{7,}.*')
+        || txt.matches('.*[0-9]{8,}.*');
+    }
+
+    function isValidChatThread(data) {
+      return data.keys().hasAll([
+          'apartmentId',
+          'apartmentTitle',
+          'category',
+          'governorate',
+          'district',
+          'baseUnitPriceEgp',
+          'commissionRatePct',
+          'commissionAmountEgp',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'landlordDisplayName',
+          'status',
+          'commissionPaid',
+          'tenantViolationCount',
+          'landlordViolationCount',
+          'lastMessagePreview',
+          'lastMessageAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'apartmentId',
+          'apartmentTitle',
+          'category',
+          'governorate',
+          'district',
+          'baseUnitPriceEgp',
+          'commissionRatePct',
+          'commissionAmountEgp',
+          'tenantId',
+          'tenantDisplayName',
+          'landlordId',
+          'landlordDisplayName',
+          'status',
+          'commissionPaid',
+          'commissionPaymentMethod',
+          'commissionPaymentRef',
+          'commissionPaidByUid',
+          'commissionPaidAt',
+          'bookingId',
+          'tenantViolationCount',
+          'landlordViolationCount',
+          'lastViolationSenderId',
+          'lastViolationReason',
+          'lastViolationAt',
+          'lastMessagePreview',
+          'lastMessageAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.apartmentId)
+        && data.apartmentTitle is string && data.apartmentTitle.size() >= 2 && data.apartmentTitle.size() <= 120
+        && isValidCategory(data.category)
+        && data.governorate is string && data.governorate.size() >= 2 && data.governorate.size() <= 50
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 80
+        && data.baseUnitPriceEgp is int && data.baseUnitPriceEgp >= 300 && data.baseUnitPriceEgp <= 5000000
+        && data.commissionRatePct is int && data.commissionRatePct >= 1 && data.commissionRatePct <= 50
+        && data.commissionAmountEgp is int
+        && data.commissionAmountEgp >= 1
+        && data.commissionAmountEgp == (data.baseUnitPriceEgp * data.commissionRatePct) / 100
+        && isValidId(data.tenantId)
+        && data.tenantDisplayName is string && data.tenantDisplayName.size() >= 2 && data.tenantDisplayName.size() <= 80
+        && isValidId(data.landlordId)
+        && data.landlordDisplayName is string && data.landlordDisplayName.size() >= 2 && data.landlordDisplayName.size() <= 80
+        && data.status is string && data.status.size() <= 30 && data.status in ['restricted_pre_payment', 'unlocked', 'flagged_violation']
+        && data.commissionPaid is bool
+        && (!('commissionPaymentMethod' in data) || (data.commissionPaymentMethod is string && data.commissionPaymentMethod in ['card_meeza', 'instapay', 'mobile_wallet', 'fawry']))
+        && (!('commissionPaymentRef' in data) || (data.commissionPaymentRef is string && data.commissionPaymentRef.size() >= 4 && data.commissionPaymentRef.size() <= 40))
+        && (!('commissionPaidByUid' in data) || isValidId(data.commissionPaidByUid))
+        && (!('commissionPaidAt' in data) || data.commissionPaidAt is timestamp)
+        && (!('bookingId' in data) || isValidId(data.bookingId))
+        && data.tenantViolationCount is int && data.tenantViolationCount >= 0 && data.tenantViolationCount <= 50
+        && data.landlordViolationCount is int && data.landlordViolationCount >= 0 && data.landlordViolationCount <= 50
+        && (!('lastViolationSenderId' in data) || isValidId(data.lastViolationSenderId))
+        && (!('lastViolationReason' in data) || (data.lastViolationReason is string && data.lastViolationReason.size() <= 200))
+        && (!('lastViolationAt' in data) || data.lastViolationAt is timestamp)
+        && data.lastMessagePreview is string && data.lastMessagePreview.size() <= 160
+        && data.lastMessageAt is timestamp
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data, threadId) {
+      return data.keys().hasAll([
+          'threadId',
+          'tenantId',
+          'landlordId',
+          'senderId',
+          'senderRole',
+          'senderDisplayName',
+          'body',
+          'isSystemNotice',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'threadId',
+          'tenantId',
+          'landlordId',
+          'senderId',
+          'senderRole',
+          'senderDisplayName',
+          'body',
+          'isSystemNotice',
+          'createdAt'
+        ])
+        && data.threadId == threadId
+        && isValidId(data.tenantId)
+        && isValidId(data.landlordId)
+        && isValidId(data.senderId)
+        && data.senderRole is string && data.senderRole in ['tenant', 'landlord', 'system']
+        && data.senderDisplayName is string && data.senderDisplayName.size() >= 2 && data.senderDisplayName.size() <= 80
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 1000
+        && data.isSystemNotice is bool
+        && data.createdAt is timestamp;
+    }
+
+    function isValidChatContactExchange(data, threadId, roleDoc) {
+      return data.keys().hasAll([
+          'threadId',
+          'tenantId',
+          'landlordId',
+          'userId',
+          'role',
+          'phoneNumber',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'threadId',
+          'tenantId',
+          'landlordId',
+          'userId',
+          'role',
+          'phoneNumber',
+          'updatedAt'
+        ])
+        && data.threadId == threadId
+        && isValidId(data.tenantId)
+        && isValidId(data.landlordId)
+        && isValidId(data.userId)
+        && data.role == roleDoc
+        && data.role in ['tenant', 'landlord']
+        && data.phoneNumber is string
+        && data.phoneNumber.matches('^01[0125][0-9]{8}$')
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Collection 0: /platformSettings/{configId}
+    // =========================================================================
+    match /platformSettings/{configId} {
+      allow get: if configId == 'config';
+      allow list: if false;
+
+      allow create: if isBootstrappedAdmin()
+        && configId == 'config'
+        && isValidPlatformSettings(incoming())
+        && incoming().updatedAt == request.time;
+
+      allow update: if isBootstrappedAdmin()
+        && configId == 'config'
+        && isValidPlatformSettings(incoming())
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'commissionRatePct',
+          'familyApartmentCommissionPct',
+          'hotelRoomCommissionPct',
+          'industrialFactoryCommissionPct',
+          'studentHousingCommissionPct',
+          'wholeHouseCommissionPct',
+          'commissionModel',
+          'escrowProtectionFeePct',
+          'tenantDiscountPct',
+          'usdRateEgp',
+          'sarRateEgp',
+          'eurRateEgp',
+          'aedRateEgp',
+          'announcementText',
+          'allowNewListings',
+          'allowNewBookings',
+          'removedShowcaseIds',
+          'updatedByUid',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // Collection 9: /bannedUsers/{userId}
+    // PII-Free User Ban Registry (Real-Time Public Feed Enforcement + Admin Control)
+    // =========================================================================
+    match /bannedUsers/{userId} {
+      allow get: if isValidId(userId) && (
+        resource == null
+        || existing().hideListings == true
+        || (isSignedIn() && request.auth.uid == userId)
+        || isBootstrappedAdmin()
+      );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if existing().hideListings == true
+        || (isSignedIn() && existing().userId == request.auth.uid)
+        || isBootstrappedAdmin();
+
+      allow create: if isBootstrappedAdmin()
+        && isValidId(userId)
+        && userId != request.auth.uid
+        && isValidBannedUser(incoming())
+        && incoming().userId == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isBootstrappedAdmin()
+        && isValidId(userId)
+        && userId != request.auth.uid
+        && isValidBannedUser(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'reason',
+          'hideListings',
+          'bannedByUid',
+          'updatedAt'
+        ]);
+
+      allow delete: if isBootstrappedAdmin() && isValidId(userId);
+    }
+
+    // =========================================================================
+    // Collection 1: /apartments/{apartmentId}
+    // =========================================================================
+    match /apartments/{apartmentId} {
+      allow get: if isValidId(apartmentId) && (
+        resource == null
+        || existing().verificationStatus == 'verified'
+        || (isSignedIn() && existing().ownerId == request.auth.uid)
+        || isBootstrappedAdmin()
+      );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if existing().verificationStatus == 'verified'
+        || (isSignedIn() && existing().ownerId == request.auth.uid)
+        || isBootstrappedAdmin();
+
+      // Pillar 7: Atomicity Guarantee (existsAfter on legalDocs/dossier) + Live Commission + Ban/Switch Check
+      allow create: if isVerifiedUser()
+        && isValidId(apartmentId)
+        && isValidApartment(incoming())
+        && hasValidSectorPricingOnCreate(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().availabilityStatus == 'available'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (incoming().verificationStatus == 'pending_review' || isBootstrappedAdmin())
+        && (isBootstrappedAdmin() || isNotBanned())
+        && areNewListingsAllowed()
+        && incoming().commissionRatePct == activeCommissionRateForCategory(incoming().category)
+        && existsAfter(/databases/$(database)/documents/apartments/$(apartmentId)/legalDocs/dossier);
+
+      // Phase 4.5 & 4.9: Validation helper first + Action-Based Updates + Immortal Fields
+      allow update: if isVerifiedUser()
+        && isValidId(apartmentId)
+        && isValidApartment(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Admin Full Moderation, Price Override & Classification Control
+          (
+            isBootstrappedAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'ownerDisplayName',
+              'category',
+              'billingMode',
+              'baseCurrency',
+              'baseMonthlyPrice',
+              'baseDailyPrice',
+              'baseStudentBedPrice',
+              'dailyRateEgp',
+              'monthlyRentEgp',
+              'studentBedsCount',
+              'studentPricePerBedEgp',
+              'houseApartmentsCount',
+              'houseFloorsCount',
+              'houseHasGardenOrRoof',
+              'houseHasPrivateGarage',
+              'houseSpecsSummary',
+              'title',
+              'description',
+              'governorate',
+              'district',
+              'lat',
+              'lng',
+              'bedrooms',
+              'bathrooms',
+              'areaSqm',
+              'furnishing',
+              'imageKey',
+              'hasVirtualTour',
+              'panorama360Key',
+              'panorama360DataUrl',
+              'virtualTourUrl',
+              'verificationStatus',
+              'availabilityStatus',
+              'commissionRatePct',
+              'updatedAt'
+            ])
+          )
+          ||
+          // Action 2: Unbanned Landlord Updates Details, Pricing, Base Currency, Whole-House Specs, or 360 Tour
+          (
+            existing().ownerId == request.auth.uid
+            && incoming().verificationStatus == existing().verificationStatus
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title',
+              'description',
+              'baseCurrency',
+              'baseMonthlyPrice',
+              'baseDailyPrice',
+              'baseStudentBedPrice',
+              'dailyRateEgp',
+              'monthlyRentEgp',
+              'studentBedsCount',
+              'studentPricePerBedEgp',
+              'houseApartmentsCount',
+              'houseFloorsCount',
+              'houseHasGardenOrRoof',
+              'houseHasPrivateGarage',
+              'houseSpecsSummary',
+              'furnishing',
+              'hasVirtualTour',
+              'panorama360Key',
+              'panorama360DataUrl',
+              'virtualTourUrl',
+              'availabilityStatus',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+        );
+
+      // Atomic Auto-Delete Upon Rental (or Owner/Admin removal)
+      allow delete: if isVerifiedUser()
+        && isValidId(apartmentId)
+        && (
+          isBootstrappedAdmin()
+          || (existing().ownerId == request.auth.uid && isNotBanned())
+          || (
+            existing().verificationStatus == 'verified'
+            && isNotBanned()
+            && !exists(/databases/$(database)/documents/bookings/$(apartmentId))
+            && existsAfter(/databases/$(database)/documents/bookings/$(apartmentId))
+            && getAfter(/databases/$(database)/documents/bookings/$(apartmentId)).data.tenantId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/bookings/$(apartmentId)).data.apartmentId == apartmentId
+            && getAfter(/databases/$(database)/documents/bookings/$(apartmentId)).data.landlordId == existing().ownerId
+            && getAfter(/databases/$(database)/documents/bookings/$(apartmentId)).data.status == 'escrow_paid'
+          )
+        );
+
+      // =======================================================================
+      // Subcollection: /apartments/{apartmentId}/legalDocs/{docId}
+      // Pillar 1 (Master Gate) + Pillar 6 (PII Isolation)
+      // =======================================================================
+      match /legalDocs/{docId} {
+        allow get: if isVerifiedUser()
+          && isValidId(apartmentId)
+          && docId == 'dossier'
+          && (
+            isBootstrappedAdmin()
+            || (
+              exists(/databases/$(database)/documents/apartments/$(apartmentId))
+              && get(/databases/$(database)/documents/apartments/$(apartmentId)).data.ownerId == request.auth.uid
+            )
+          );
+
+        allow list: if false;
+
+        allow create: if isVerifiedUser()
+          && isValidId(apartmentId)
+          && docId == 'dossier'
+          && isValidLegalDossier(incoming(), apartmentId)
+          && incoming().createdAt == request.time
+          && (isBootstrappedAdmin() || isNotBanned())
+          && existsAfter(/databases/$(database)/documents/apartments/$(apartmentId))
+          && getAfter(/databases/$(database)/documents/apartments/$(apartmentId)).data.ownerId == request.auth.uid;
+
+        allow update: if false;
+
+        allow delete: if isBootstrappedAdmin()
+          && isValidId(apartmentId)
+          && docId == 'dossier';
+      }
+    }
+
+    // =========================================================================
+    // Collection 3: /bookings/{bookingId}
+    // =========================================================================
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn()
+        && isValidId(bookingId)
+        && (
+          existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if isSignedIn()
+        && (
+          existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Phase 4.11 & Pillar 7: Global Consistency + Dynamic One-Time Commission + Atomic Deletion
+      allow create: if isVerifiedUser()
+        && isValidId(bookingId)
+        && isValidBooking(incoming())
+        && bookingId == incoming().apartmentId
+        && incoming().tenantId == request.auth.uid
+        && incoming().status == 'escrow_paid'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && areNewBookingsAllowed()
+        && incoming().commissionRatePct == ('category' in incoming() ? activeCommissionRateForCategory(incoming().category) : activeCommissionRate())
+        && exists(/databases/$(database)/documents/apartments/$(bookingId))
+        && !existsAfter(/databases/$(database)/documents/apartments/$(bookingId))
+        && get(/databases/$(database)/documents/apartments/$(bookingId)).data.verificationStatus == 'verified'
+        && get(/databases/$(database)/documents/apartments/$(bookingId)).data.ownerId == incoming().landlordId
+        && matchesParentUnitRate(incoming(), get(/databases/$(database)/documents/apartments/$(bookingId)).data);
+
+      // Phase 4.5 & 4.6: Action-Based Update + Terminal State Locking ('completed')
+      allow update: if isVerifiedUser()
+        && isValidId(bookingId)
+        && isValidBooking(incoming())
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().tenantId == existing().tenantId
+        && incoming().landlordId == existing().landlordId
+        && incoming().totalRentEgp == existing().totalRentEgp
+        && incoming().platformCommissionEgp == existing().platformCommissionEgp
+        && incoming().landlordNetEgp == existing().landlordNetEgp
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (
+          isBootstrappedAdmin()
+          ||
+          (
+            existing().status == 'escrow_paid'
+            && existing().tenantId == request.auth.uid
+            && incoming().status == 'completed'
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isBootstrappedAdmin() && isValidId(bookingId);
+    }
+
+    // =========================================================================
+    // Collection 4: /reviews/{reviewId}
+    // =========================================================================
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && (
+        existing().visibilityStatus == 'published'
+        || (isSignedIn() && existing().tenantId == request.auth.uid)
+        || isBootstrappedAdmin()
+      );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if existing().visibilityStatus == 'published'
+        || (isSignedIn() && existing().tenantId == request.auth.uid)
+        || isBootstrappedAdmin();
+
+      allow create: if isVerifiedUser()
+        && isValidId(reviewId)
+        && isValidReview(incoming())
+        && reviewId == incoming().bookingId
+        && incoming().tenantId == request.auth.uid
+        && incoming().visibilityStatus == 'published'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isNotBanned()
+        && exists(/databases/$(database)/documents/bookings/$(reviewId))
+        && get(/databases/$(database)/documents/bookings/$(reviewId)).data.tenantId == request.auth.uid
+        && get(/databases/$(database)/documents/bookings/$(reviewId)).data.landlordId == incoming().landlordId
+        && get(/databases/$(database)/documents/bookings/$(reviewId)).data.apartmentId == incoming().apartmentId;
+
+      allow update: if isVerifiedUser()
+        && isValidId(reviewId)
+        && isValidReview(incoming())
+        && incoming().bookingId == existing().bookingId
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().apartmentTitle == existing().apartmentTitle
+        && incoming().governorate == existing().governorate
+        && incoming().landlordId == existing().landlordId
+        && incoming().landlordDisplayName == existing().landlordDisplayName
+        && incoming().tenantId == existing().tenantId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isBootstrappedAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['visibilityStatus', 'updatedAt'])
+          )
+          ||
+          (
+            existing().tenantId == request.auth.uid
+            && existing().visibilityStatus == 'published'
+            && incoming().visibilityStatus == 'published'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'rating',
+              'landlordRating',
+              'landlordVerdict',
+              'comment',
+              'tenantDisplayName',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isBootstrappedAdmin() && isValidId(reviewId);
+    }
+
+    // =========================================================================
+    // Collection 5: /favorites/{favoriteId}
+    // =========================================================================
+    match /favorites/{favoriteId} {
+      allow get: if isSignedIn()
+        && isValidId(favoriteId)
+        && (
+          resource == null
+          || existing().userId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow list: if isSignedIn()
+        && (
+          existing().userId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow create: if isVerifiedUser()
+        && isValidId(favoriteId)
+        && isValidFavorite(incoming())
+        && incoming().userId == request.auth.uid
+        && favoriteId == incoming().userId + '__' + incoming().apartmentId
+        && incoming().createdAt == request.time
+        && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time)
+        && (isBootstrappedAdmin() || isNotBanned())
+        && (
+          isShowcaseApartmentId(incoming().apartmentId)
+          || (
+            exists(/databases/$(database)/documents/apartments/$(incoming().apartmentId))
+            && get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.verificationStatus == 'verified'
+          )
+        );
+
+      // Action-Based Update: Toggle Price Drop Alert or Update Alerted Baseline
+      allow update: if isVerifiedUser()
+        && isValidId(favoriteId)
+        && isValidFavorite(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && ('updatedAt' in incoming())
+        && incoming().updatedAt == request.time
+        && (
+          isBootstrappedAdmin()
+          || (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'priceAlertEnabled',
+              'baselineMonthlyRentEgp',
+              'baselineDailyRateEgp',
+              'monthlyRentEgp',
+              'dailyRateEgp',
+              'lastAlertedRentEgp',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(favoriteId)
+        && (
+          existing().userId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+    }
+
+    // =========================================================================
+    // Collection 6: /tenantVerifications/{userId}
+    // Tenant KYC Review Queue + PII-Isolated /privateDocs/kyc Subcollection
+    // =========================================================================
+    match /tenantVerifications/{userId} {
+      allow get: if isSignedIn()
+        && isValidId(userId)
+        && (
+          request.auth.uid == userId
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if isSignedIn()
+        && (
+          existing().userId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 7: Atomicity Guarantee (existsAfter on privateDocs/kyc)
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidTenantVerification(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().verificationStatus == 'pending_review'
+        && incoming().reviewNote == ''
+        && incoming().submittedAt == request.time
+        && incoming().updatedAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && existsAfter(/databases/$(database)/documents/tenantVerifications/$(userId)/privateDocs/kyc);
+
+      // Action-Based Update: Project Team Approves/Rejects OR Tenant Re-submits KYC
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidTenantVerification(incoming())
+        && incoming().userId == existing().userId
+        && incoming().submittedAt == existing().submittedAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isBootstrappedAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'verificationStatus',
+              'reviewNote',
+              'updatedAt'
+            ])
+          )
+          ||
+          (
+            userId == request.auth.uid
+            && existing().userId == request.auth.uid
+            && incoming().verificationStatus == 'pending_review'
+            && incoming().reviewNote == ''
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'tenantDisplayName',
+              'tenantCategory',
+              'verificationStatus',
+              'reviewNote',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isBootstrappedAdmin() && isValidId(userId);
+
+      // =======================================================================
+      // Subcollection: /tenantVerifications/{userId}/privateDocs/{docId}
+      // Pillar 1 (Master Gate) + Pillar 6 (Strict PII Isolation)
+      // =======================================================================
+      match /privateDocs/{docId} {
+        allow get: if isVerifiedUser()
+          && isValidId(userId)
+          && docId == 'kyc'
+          && (
+            isBootstrappedAdmin()
+            || (
+              request.auth.uid == userId
+              && (
+                resource == null
+                || (
+                  exists(/databases/$(database)/documents/tenantVerifications/$(userId))
+                  && get(/databases/$(database)/documents/tenantVerifications/$(userId)).data.userId == request.auth.uid
+                )
+              )
+            )
+          );
+
+        allow list: if false;
+
+        allow create: if isVerifiedUser()
+          && isValidId(userId)
+          && docId == 'kyc'
+          && request.auth.uid == userId
+          && isValidTenantKycPrivate(incoming(), userId)
+          && incoming().updatedAt == request.time
+          && (isBootstrappedAdmin() || isNotBanned())
+          && existsAfter(/databases/$(database)/documents/tenantVerifications/$(userId))
+          && getAfter(/databases/$(database)/documents/tenantVerifications/$(userId)).data.userId == request.auth.uid;
+
+        allow update: if isVerifiedUser()
+          && isValidId(userId)
+          && docId == 'kyc'
+          && request.auth.uid == userId
+          && isValidTenantKycPrivate(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'fullLegalName',
+            'nationalIdNumber',
+            'tenantPhone',
+            'occupationOrUniversity',
+            'idCardFileName',
+            'idCardSha256',
+            'supportingDocFileName',
+            'supportingDocSha256',
+            'updatedAt'
+          ])
+          && (isBootstrappedAdmin() || isNotBanned())
+          && existsAfter(/databases/$(database)/documents/tenantVerifications/$(userId))
+          && getAfter(/databases/$(database)/documents/tenantVerifications/$(userId)).data.userId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/tenantVerifications/$(userId)).data.verificationStatus == 'pending_review';
+
+        allow delete: if isBootstrappedAdmin()
+          && isValidId(userId)
+          && docId == 'kyc';
+      }
+    }
+
+    // =========================================================================
+    // Collection 7: /rentalRequests/{requestId}
+    // Transparent Rental Request Lifecycle (Pending Approval / Awaiting Payment / Approved / Cancelled)
+    // =========================================================================
+    match /rentalRequests/{requestId} {
+      allow get: if isSignedIn()
+        && isValidId(requestId)
+        && (
+          resource == null
+          || existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if isSignedIn()
+        && (
+          existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow create: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidRentalRequest(incoming())
+        && incoming().tenantId == request.auth.uid
+        && incoming().status in ['pending_approval', 'awaiting_payment']
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && areNewBookingsAllowed()
+        && incoming().commissionRatePct == activeCommissionRateForCategory(incoming().category)
+        && (
+          (
+            exists(/databases/$(database)/documents/apartments/$(incoming().apartmentId))
+            && get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.verificationStatus == 'verified'
+            && get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.ownerId == incoming().landlordId
+          )
+          || (
+            !exists(/databases/$(database)/documents/apartments/$(incoming().apartmentId))
+            && isShowcaseApartmentId(incoming().apartmentId)
+            && incoming().landlordId == 'showcase_owner'
+          )
+        );
+
+      // Phase 4.5, 4.6, 4.9: Validation helper first + Action-Based Updates + Terminal State Locking
+      allow update: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidRentalRequest(incoming())
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().tenantId == existing().tenantId
+        && incoming().landlordId == existing().landlordId
+        && incoming().unitPriceEgp == existing().unitPriceEgp
+        && incoming().unitsCount == existing().unitsCount
+        && incoming().bedsBooked == existing().bedsBooked
+        && incoming().commissionRatePct == existing().commissionRatePct
+        && incoming().totalRentEgp == existing().totalRentEgp
+        && incoming().platformCommissionEgp == existing().platformCommissionEgp
+        && incoming().landlordNetEgp == existing().landlordNetEgp
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Escape hatch for Platform Admin
+          (
+            isBootstrappedAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status',
+              'statusNote',
+              'paymentCurrency',
+              'exchangeRateToEgp',
+              'paidAmountInCurrency',
+              'updatedAt'
+            ])
+          )
+          ||
+          // Action 1: Landlord approves pending request -> awaiting_payment
+          (
+            existing().status == 'pending_approval'
+            && existing().landlordId == request.auth.uid
+            && incoming().status == 'awaiting_payment'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'statusNote', 'updatedAt'])
+            && isNotBanned()
+          )
+          ||
+          // Action 2: Tenant completes escrow payment -> approved (must atomically pair with paid booking)
+          (
+            existing().status in ['pending_approval', 'awaiting_payment']
+            && existing().tenantId == request.auth.uid
+            && incoming().status == 'approved'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status',
+              'statusNote',
+              'paymentCurrency',
+              'exchangeRateToEgp',
+              'paidAmountInCurrency',
+              'updatedAt'
+            ])
+            && isNotBanned()
+            && existsAfter(/databases/$(database)/documents/bookings/$(existing().apartmentId))
+            && getAfter(/databases/$(database)/documents/bookings/$(existing().apartmentId)).data.tenantId == request.auth.uid
+          )
+          ||
+          // Action 3: Tenant or Landlord cancels active non-terminal request -> cancelled
+          (
+            existing().status in ['pending_approval', 'awaiting_payment']
+            && (existing().tenantId == request.auth.uid || existing().landlordId == request.auth.uid)
+            && incoming().status == 'cancelled'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'statusNote', 'updatedAt'])
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isBootstrappedAdmin() && isValidId(requestId);
+    }
+
+    // =========================================================================
+    // Collection 8: /notifications/{notificationId}
+    // Recipient-Isolated Rental Status & Price Drop Notifications with Relational Anti-Spam Guard
+    // =========================================================================
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn()
+        && isValidId(notificationId)
+        && (
+          resource == null
+          || existing().recipientId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if isSignedIn()
+        && (
+          existing().recipientId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow create: if isVerifiedUser()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().actorId == request.auth.uid
+        && incoming().isRead == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && canDeliverNotification(incoming());
+
+      // Phase 4.5 & 4.9: Validation helper first + Recipient Read-State Toggle Only
+      allow update: if isVerifiedUser()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().recipientId == existing().recipientId
+        && incoming().actorId == existing().actorId
+        && incoming().actorDisplayName == existing().actorDisplayName
+        && incoming().recipientRole == existing().recipientRole
+        && incoming().statusType == existing().statusType
+        && incoming().relatedEntityType == existing().relatedEntityType
+        && incoming().relatedEntityId == existing().relatedEntityId
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().apartmentTitle == existing().apartmentTitle
+        && incoming().governorate == existing().governorate
+        && incoming().amountEgp == existing().amountEgp
+        && incoming().title == existing().title
+        && incoming().message == existing().message
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (existing().recipientId == request.auth.uid || isBootstrappedAdmin())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['isRead', 'updatedAt']);
+
+      allow delete: if isVerifiedUser()
+        && isValidId(notificationId)
+        && (
+          existing().recipientId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+    }
+
+    // =========================================================================
+    // Collection 10: /adminActivityLogs/{logId}
+    // Tamper-Evident Administrative Audit Trail (Strictly Admin-Isolated & Immutable)
+    // =========================================================================
+    match /adminActivityLogs/{logId} {
+      allow get: if isBootstrappedAdmin()
+        && isValidId(logId)
+        && (resource == null || existing().actorUid is string && existing().actorUid.size() <= 128);
+
+      // Pillar 8: Secure List Queries (Explicit resource.data check + Admin isolation, zero get/exists)
+      allow list: if isBootstrappedAdmin()
+        && existing().actorUid is string
+        && existing().actorUid.size() <= 128;
+
+      allow create: if isBootstrappedAdmin()
+        && isValidId(logId)
+        && isValidAdminActivityLog(incoming())
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+
+      // Immutable audit log: entries cannot be altered or deleted once recorded
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // Collection 11: /bookingDemandSignals/{bookingId}
+    // Zero-PII Spatial Demand Signals Verified Against Completed Bookings (Heatmap)
+    // =========================================================================
+    match /bookingDemandSignals/{bookingId} {
+      allow get: if isValidId(bookingId)
+        && (resource == null || existing().status == 'completed');
+
+      // Pillar 8: Secure List Queries (Explicit resource.data check, zero get/exists)
+      allow list: if existing().status == 'completed';
+
+      allow create: if isVerifiedUser()
+        && isValidId(bookingId)
+        && isValidBookingDemandSignal(incoming(), bookingId)
+        && incoming().status == 'completed'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && existsAfter(/databases/$(database)/documents/bookings/$(bookingId))
+        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'completed'
+        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.apartmentId == incoming().apartmentId
+        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.governorate == incoming().governorate
+        && getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.totalRentEgp == incoming().totalRentEgp
+        && (
+          isBootstrappedAdmin()
+          || getAfter(/databases/$(database)/documents/bookings/$(bookingId)).data.tenantId == request.auth.uid
+        );
+
+      allow update: if isBootstrappedAdmin()
+        && isValidId(bookingId)
+        && isValidBookingDemandSignal(incoming(), bookingId)
+        && incoming().bookingId == existing().bookingId
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().category == existing().category
+        && incoming().governorate == existing().governorate
+        && incoming().status == existing().status
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'district',
+          'lat',
+          'lng',
+          'unitsCount',
+          'totalRentEgp',
+          'updatedAt'
+        ]);
+
+      allow delete: if isBootstrappedAdmin() && isValidId(bookingId);
+    }
+
+    // =========================================================================
+    // Collection 12: /chatThreads/{threadId}
+    // Privacy-Enforced Tenant-Landlord Chat, Anti-Phone-Leak Guard & Commission Gate
+    // =========================================================================
+    match /chatThreads/{threadId} {
+      allow get: if isSignedIn()
+        && isValidId(threadId)
+        && (
+          resource == null
+          || existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      // Pillar 8: Secure List Queries (Zero get/exists calls inside list)
+      allow list: if isSignedIn()
+        && (
+          existing().tenantId == request.auth.uid
+          || existing().landlordId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow create: if isVerifiedUser()
+        && isValidId(threadId)
+        && isValidChatThread(incoming())
+        && threadId == incoming().tenantId + '__' + incoming().apartmentId
+        && incoming().tenantId == request.auth.uid
+        && (incoming().landlordId != request.auth.uid || isBootstrappedAdmin())
+        && incoming().status == 'restricted_pre_payment'
+        && incoming().commissionPaid == false
+        && incoming().tenantViolationCount == 0
+        && incoming().landlordViolationCount == 0
+        && !hasPhoneNumberLeak(incoming().lastMessagePreview)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().lastMessageAt == request.time
+        && (isBootstrappedAdmin() || isNotBanned())
+        && incoming().commissionRatePct == activeCommissionRateForCategory(incoming().category)
+        && (
+          (
+            exists(/databases/$(database)/documents/apartments/$(incoming().apartmentId))
+            && get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.verificationStatus == 'verified'
+            && get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.ownerId == incoming().landlordId
+            && incoming().baseUnitPriceEgp in [
+              get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.monthlyRentEgp,
+              get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.dailyRateEgp,
+              get(/databases/$(database)/documents/apartments/$(incoming().apartmentId)).data.studentPricePerBedEgp
+            ]
+          )
+          || (
+            exists(/databases/$(database)/documents/bookings/$(incoming().apartmentId))
+            && get(/databases/$(database)/documents/bookings/$(incoming().apartmentId)).data.tenantId == request.auth.uid
+            && get(/databases/$(database)/documents/bookings/$(incoming().apartmentId)).data.landlordId == incoming().landlordId
+          )
+          || (
+            !exists(/databases/$(database)/documents/apartments/$(incoming().apartmentId))
+            && isShowcaseApartmentId(incoming().apartmentId)
+            && incoming().landlordId == 'showcase_owner'
+          )
+        );
+
+      allow update: if isVerifiedUser()
+        && isValidId(threadId)
+        && isValidChatThread(incoming())
+        && incoming().apartmentId == existing().apartmentId
+        && incoming().tenantId == existing().tenantId
+        && incoming().landlordId == existing().landlordId
+        && incoming().baseUnitPriceEgp == existing().baseUnitPriceEgp
+        && incoming().commissionRatePct == existing().commissionRatePct
+        && incoming().commissionAmountEgp == existing().commissionAmountEgp
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Platform Admin full moderation / unlock / reset
+          isBootstrappedAdmin()
+          || (
+            // Action 2: Normal message preview sync by active participant
+            (existing().tenantId == request.auth.uid || existing().landlordId == request.auth.uid)
+            && existing().status != 'flagged_violation'
+            && incoming().status == existing().status
+            && incoming().commissionPaid == existing().commissionPaid
+            && incoming().tenantViolationCount == existing().tenantViolationCount
+            && incoming().landlordViolationCount == existing().landlordViolationCount
+            && (existing().commissionPaid == true || !hasPhoneNumberLeak(incoming().lastMessagePreview))
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'lastMessagePreview',
+              'lastMessageAt',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+          || (
+            // Action 3: Anti-circumvention phone-bypass strike logging
+            (existing().tenantId == request.auth.uid || existing().landlordId == request.auth.uid)
+            && existing().commissionPaid == false
+            && incoming().commissionPaid == false
+            && incoming().lastViolationSenderId == request.auth.uid
+            && incoming().lastViolationAt == request.time
+            && (
+              (
+                request.auth.uid == existing().tenantId
+                && incoming().tenantViolationCount == existing().tenantViolationCount + 1
+                && incoming().landlordViolationCount == existing().landlordViolationCount
+                && (
+                  (incoming().tenantViolationCount >= 3 && incoming().status == 'flagged_violation')
+                  || (incoming().tenantViolationCount < 3 && incoming().status == existing().status)
+                )
+              )
+              || (
+                request.auth.uid == existing().landlordId
+                && incoming().landlordViolationCount == existing().landlordViolationCount + 1
+                && incoming().tenantViolationCount == existing().tenantViolationCount
+                && (
+                  (incoming().landlordViolationCount >= 3 && incoming().status == 'flagged_violation')
+                  || (incoming().landlordViolationCount < 3 && incoming().status == existing().status)
+                )
+              )
+            )
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'tenantViolationCount',
+              'landlordViolationCount',
+              'lastViolationSenderId',
+              'lastViolationReason',
+              'lastViolationAt',
+              'status',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+          || (
+            // Action 4: Commission payment unlock (either direct commission settlement or atomic full Escrow booking)
+            existing().tenantId == request.auth.uid
+            && existing().commissionPaid == false
+            && incoming().commissionPaid == true
+            && incoming().status == 'unlocked'
+            && incoming().commissionPaidByUid == request.auth.uid
+            && incoming().commissionPaidAt == request.time
+            && ('commissionPaymentMethod' in incoming())
+            && ('commissionPaymentRef' in incoming())
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status',
+              'commissionPaid',
+              'commissionPaymentMethod',
+              'commissionPaymentRef',
+              'commissionPaidByUid',
+              'commissionPaidAt',
+              'bookingId',
+              'lastMessagePreview',
+              'lastMessageAt',
+              'updatedAt'
+            ])
+            && isNotBanned()
+          )
+        );
+
+      allow delete: if isBootstrappedAdmin() && isValidId(threadId);
+
+      // =======================================================================
+      // Subcollection: /chatThreads/{threadId}/messages/{messageId}
+      // =======================================================================
+      match /messages/{messageId} {
+        allow get: if isSignedIn()
+          && isValidId(threadId)
+          && isValidId(messageId)
+          && (
+            resource == null
+            || existing().tenantId == request.auth.uid
+            || existing().landlordId == request.auth.uid
+            || isBootstrappedAdmin()
+          );
+
+        // Pillar 8: Zero get/exists inside allow list using denormalized tenantId/landlordId
+        allow list: if isSignedIn()
+          && (
+            existing().tenantId == request.auth.uid
+            || existing().landlordId == request.auth.uid
+            || isBootstrappedAdmin()
+          );
+
+        allow create: if isVerifiedUser()
+          && isValidId(threadId)
+          && isValidId(messageId)
+          && isValidChatMessage(incoming(), threadId)
+          && incoming().senderId == request.auth.uid
+          && incoming().createdAt == request.time
+          && (isBootstrappedAdmin() || isNotBanned())
+          && existsAfter(/databases/$(database)/documents/chatThreads/$(threadId))
+          && getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.tenantId == incoming().tenantId
+          && getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.landlordId == incoming().landlordId
+          && (
+            isBootstrappedAdmin()
+            || (
+              getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.status != 'flagged_violation'
+              && (
+                (request.auth.uid == incoming().tenantId && incoming().senderRole in ['tenant', 'system'])
+                || (request.auth.uid == incoming().landlordId && incoming().senderRole in ['landlord', 'system'])
+              )
+            )
+          )
+          && (
+            getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.commissionPaid == true
+            || incoming().isSystemNotice == true
+            || !hasPhoneNumberLeak(incoming().body)
+          );
+
+        allow update: if false;
+        allow delete: if isBootstrappedAdmin() && isValidId(threadId) && isValidId(messageId);
+      }
+
+      // =======================================================================
+      // Subcollection: /chatThreads/{threadId}/contactExchange/{roleDoc}
+      // Strictly PII-Isolated Phone Numbers — Counterparty Read Locked Until commissionPaid == true
+      // =======================================================================
+      match /contactExchange/{roleDoc} {
+        allow get: if isSignedIn()
+          && isValidId(threadId)
+          && roleDoc in ['tenant', 'landlord']
+          && (
+            isBootstrappedAdmin()
+            || (resource != null && existing().userId == request.auth.uid)
+            || (
+              resource == null
+              && exists(/databases/$(database)/documents/chatThreads/$(threadId))
+              && (
+                (roleDoc == 'tenant' && get(/databases/$(database)/documents/chatThreads/$(threadId)).data.tenantId == request.auth.uid)
+                || (roleDoc == 'landlord' && get(/databases/$(database)/documents/chatThreads/$(threadId)).data.landlordId == request.auth.uid)
+              )
+            )
+            || (
+              exists(/databases/$(database)/documents/chatThreads/$(threadId))
+              && get(/databases/$(database)/documents/chatThreads/$(threadId)).data.commissionPaid == true
+              && (
+                get(/databases/$(database)/documents/chatThreads/$(threadId)).data.tenantId == request.auth.uid
+                || get(/databases/$(database)/documents/chatThreads/$(threadId)).data.landlordId == request.auth.uid
+              )
+            )
+          );
+
+        allow list: if false;
+
+        allow create, update: if isVerifiedUser()
+          && isValidId(threadId)
+          && roleDoc in ['tenant', 'landlord']
+          && isValidChatContactExchange(incoming(), threadId, roleDoc)
+          && incoming().updatedAt == request.time
+          && (isBootstrappedAdmin() || isNotBanned())
+          && existsAfter(/databases/$(database)/documents/chatThreads/$(threadId))
+          && getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.tenantId == incoming().tenantId
+          && getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.landlordId == incoming().landlordId
+          && (
+            isBootstrappedAdmin()
+            || (
+              roleDoc == 'tenant'
+              && request.auth.uid == incoming().tenantId
+              && incoming().userId == request.auth.uid
+            )
+            || (
+              roleDoc == 'landlord'
+              && request.auth.uid == incoming().landlordId
+              && incoming().userId == request.auth.uid
+            )
+            || (
+              roleDoc == 'landlord'
+              && incoming().landlordId == 'showcase_owner'
+              && request.auth.uid == incoming().tenantId
+              && getAfter(/databases/$(database)/documents/chatThreads/$(threadId)).data.commissionPaid == true
+              && incoming().userId == 'showcase_owner'
+              && incoming().phoneNumber == '01000000123'
+            )
+          );
+
+        allow delete: if isBootstrappedAdmin() && isValidId(threadId) && roleDoc in ['tenant', 'landlord'];
+      }
+    }
+  }
+}
+
